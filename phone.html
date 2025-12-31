@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>回答選択</title>
+</head>
+<body>
+
+<h2>番号を選んでください</h2>
+
+<button onclick="selectNumber(1)">1</button>
+<button onclick="selectNumber(2)">2</button>
+<button onclick="selectNumber(3)">3</button>
+<button onclick="selectNumber(4)">4</button>
+<button onclick="selectNumber(5)">5</button>
+
+<script>
+function selectNumber(num) {
+  // 選んだ番号を保存
+  localStorage.setItem("selected", num);
+
+  alert("番号 " + num + " を選びました。\n次に犬の写真タグにかざしてください。");
+}
+</script>
+
+</body>
+</html>

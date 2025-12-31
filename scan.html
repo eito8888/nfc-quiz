@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>送信中</title>
+</head>
+<body>
+
+<p>判定中です…</p>
+
+<script>
+const dog = new URLSearchParams(location.search).get("dog");
+const selected = localStorage.getItem("selected");
+
+// ★ここを自分のGASのURLに置き換える
+location.href =
+  "https://script.google.com/macros/s/XXXX/exec"
+  + "?dog=" + dog
+  + "&selected=" + selected
+  + "&player=1";
+</script>
+
+</body>
+</html>

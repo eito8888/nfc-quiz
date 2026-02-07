@@ -1,84 +1,145 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8">
-  <title>回答ページ</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-    }
+<meta charset="utf-8">
+<title>回答画面</title>
 
-    h1 {
-      font-size: 40px;
-      margin-top: 30px;
-    }
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  margin: 0;
+  padding: 0;
+}
 
-    .grid {
-      display: grid;
-      grid-template-columns: repeat(5, 1fr);
-      gap: 15px;
-      margin: 30px;
-    }
+/* 選択中表示（最重要） */
+#chosen {
+  font-size: 34px;
+  font-weight: bold;
+  padding: 15px;
+  margin: 15px;
+  border: 3px solid black;
+  border-radius: 15px;
+}
 
-    button {
-      font-size: 50px;
-      padding: 30px;
-      border-radius: 20px;
-      border: none;
-      background: #eee;
-      cursor: pointer;
-    }
+/* 正解・不正解表示 */
+#result {
+  font-size: 20px;
+  margin: 10px;
+}
 
-    button:active {
-      background: #ccc;
-    }
+/* 履歴表示（小さめでOK） */
+#history {
+  font-size: 14px;
+  margin: 10px;
+  white-space: pre-line;
+}
 
-    #result {
-      font-size: 50px;
-      margin-top: 30px;
-      font-weight: bold;
-    }
-  </style>
+/* ボタン配置（横4列） */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 20px;
+}
+
+/* ボタンは大きく */
+button {
+  font-size: 30px;
+  padding: 24px;
+  border-radius: 18px;
+}
+</style>
+
 </head>
-
 <body>
 
-<h1>番号を選んでください</h1>
+<!-- 選択中 -->
+<div id="chosen">番号を選んでください</div>
 
-<div class="grid" id="buttons"></div>
-
+<!-- 正解表示 -->
 <div id="result"></div>
 
+<!-- 履歴 -->
+<div id="history"></div>
+
+<!-- ボタン -->
+<div class="grid" id="buttons"></div>
+
 <script>
-const GAS_URL = "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+/* ★あなたのGAS URLをここに入れる */
+const GAS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXX/exec";
 
-// URLから dog を取得（タグが渡す）
-const params = new URLSearchParams(location.search);
-const dog = params.get("dog"); 
-const player = params.get("player") || "iphone";
+/* プレイヤー名（あだ名OK） */
+let player = localStorage.getItem("player");
+if (!player) {
+  player = prompt("名前（あだ名）を入力してください");
+  localStorage.setItem("player", player);
+}
 
-const buttonsDiv = document.getElementById("buttons");
+/* 今選んでいる番号 */
+let chosenNumber = null;
 
-// 1〜10ボタンを作る
+/* NFCタグで渡される犬番号 */
+const dog = new URLSearchParams(location.search).get("dog");
+
+/* 表示エリア */
+const chosenDiv = document.getElementById("chosen");
+const resultDiv = document.getElementById("result");
+const historyDiv = document.getElementById("history");
+
+/* ボタン生成（1〜10） */
+const btnArea = document.getElementById("buttons");
+
 for (let i = 1; i <= 10; i++) {
   const btn = document.createElement("button");
-  btn.textContent = i;
+  btn.innerText = i;
 
-  btn.onclick = async () => {
-    const res = await fetch(
-      `${GAS_URL}?player=${player}&selected=${i}&dog=${dog}`
-    );
-
-    const text = await res.text();
-
-    document.getElementById("result").textContent =
-      (text === "correct") ? "✅ 正解！" : "❌ 不正解";
+  /* 押したら「選択中」になるだけ */
+  btn.onclick = () => {
+    chosenNumber = i;
+    chosenDiv.innerText = `🎯 選択中：${i}番`;
+    resultDiv.innerText = "";
   };
 
-  buttonsDiv.appendChild(btn);
+  btnArea.appendChild(btn);
 }
+
+/* NFCタグをかざした瞬間に送信する */
+async function sendAnswer() {
+
+  if (!chosenNumber) {
+    chosenDiv.innerText = "⚠ 先に番号を選んでください";
+    return;
+  }
+
+  /* GASへ送信 */
+  const res = await fetch(
+    `${GAS_URL}?player=${player}&selected=${chosenNumber}&dog=${dog}`
+  );
+
+  const data = await res.json();
+
+  /* 判定表示 */
+  if (data.result === "correct") {
+    resultDiv.innerText =
+      `🎉 正解！！あなたの答え：${chosenNumber}番（${data.dogName}）`;
+  } else {
+    resultDiv.innerText =
+      `❌ 残念…あなたの答え：${chosenNumber}番（${data.dogName}）`;
+  }
+
+  /* 履歴表示（番号＋犬名） */
+  historyDiv.innerText =
+    `正解した番号：${data.correctNumbers.join(", ")}\n` +
+    `正解した犬：${data.correctDogs.join("、")}`;
+}
+
+/* ページが開いた瞬間に送信する（タグをかざした動作） */
+sendAnswer();
+
 </script>
 
 </body>
 </html>
+

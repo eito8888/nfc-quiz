@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>回答ページ</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 40px;
+      margin-top: 30px;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 15px;
+      margin: 30px;
+    }
+
+    button {
+      font-size: 50px;
+      padding: 30px;
+      border-radius: 20px;
+      border: none;
+      background: #eee;
+      cursor: pointer;
+    }
+
+    button:active {
+      background: #ccc;
+    }
+
+    #result {
+      font-size: 50px;
+      margin-top: 30px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+
+<h1>番号を選んでください</h1>
+
+<div class="grid" id="buttons"></div>
+
+<div id="result"></div>
+
+<script>
+const GAS_URL = "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+
+// URLから dog を取得（タグが渡す）
+const params = new URLSearchParams(location.search);
+const dog = params.get("dog"); 
+const player = params.get("player") || "iphone";
+
+const buttonsDiv = document.getElementById("buttons");
+
+// 1〜10ボタンを作る
+for (let i = 1; i <= 10; i++) {
+  const btn = document.createElement("button");
+  btn.textContent = i;
+
+  btn.onclick = async () => {
+    const res = await fetch(
+      `${GAS_URL}?player=${player}&selected=${i}&dog=${dog}`
+    );
+
+    const text = await res.text();
+
+    document.getElementById("result").textContent =
+      (text === "correct") ? "✅ 正解！" : "❌ 不正解";
+  };
+
+  buttonsDiv.appendChild(btn);
+}
+</script>
+
+</body>
+</html>

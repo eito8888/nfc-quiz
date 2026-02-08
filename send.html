@@ -8,24 +8,25 @@
 body {
   font-family: sans-serif;
   text-align: center;
-  padding-top: 60px;
+  padding-top: 70px;
 }
 
 h1 {
-  font-size: 46px;
+  font-size: 52px;
+  font-weight: bold;
 }
 
 #msg {
-  font-size: 40px;
+  font-size: 46px;
   font-weight: bold;
-  margin-top: 30px;
+  margin-top: 40px;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📡 送信中...</h1>
+<h1>📡 送信中…</h1>
 <div id="msg"></div>
 
 <script>
@@ -34,40 +35,57 @@ const GAS_URL =
 "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
 /* 保存された情報 */
-const player = localStorage.getItem("player");
+const player   = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
 
-/* NFCタグの dog番号 */
+/* NFCタグから渡される dog番号 */
 const dog = new URLSearchParams(location.search).get("dog");
 
-/* 番号未選択なら戻す */
+/* 表示エリア */
+const msgDiv = document.getElementById("msg");
+
+/* 番号未選択なら終了 */
 if (!selected) {
-  document.getElementById("msg").innerText =
-    "⚠ 番号が選ばれていません";
-}
 
-/* 送信 */
-async function send() {
+  msgDiv.innerText = "⚠ 番号が選ばれていません";
 
-  const res = await fetch(
-    `${GAS_URL}?player=${player}&selected=${selected}&dog=${dog}`
-  );
+  /* 2秒後に戻る */
+  setTimeout(() => {
+    window.location.replace(
+      "https://eito8888.github.io/nfc-quiz/player.html"
+    );
+  }, 2000);
 
-  const data = await res.json();
+} else {
 
-  if (data.result === "correct") {
-    document.getElementById("msg").innerText = "🎉 正解！";
-  } else {
-    document.getElementById("msg").innerText = "❌ 不正解";
+  /* 送信処理 */
+  async function send() {
+
+    const res = await fetch(
+      `${GAS_URL}?player=${player}&selected=${selected}&dog=${dog}`
+    );
+
+    const data = await res.json();
+
+    /* 判定表示 */
+    if (data.result === "correct") {
+      msgDiv.innerText = "🎉 正解！";
+    } else {
+      msgDiv.innerText = "❌ 不正解";
+    }
+
+    /* ★2秒後に必ず番号画面へ戻る */
+    setTimeout(() => {
+
+      window.location.replace(
+        "https://eito8888.github.io/nfc-quiz/player.html"
+      );
+
+    }, 2000);
   }
 
-  /* ★2秒後に戻る */
-  setTimeout(() => {
-    location.href = "player.html";
-  }, 2000);
+  send();
 }
-
-send();
 </script>
 
 </body>

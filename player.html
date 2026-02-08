@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>回答画面</title>
+<title>回答画面（最強B方式）</title>
 
 <style>
 body {
@@ -22,13 +22,13 @@ body {
   border-radius: 15px;
 }
 
-/* 正解・不正解表示 */
+/* 結果表示 */
 #result {
   font-size: 20px;
   margin: 10px;
 }
 
-/* 履歴表示（小さめでOK） */
+/* 履歴表示 */
 #history {
   font-size: 14px;
   margin: 10px;
@@ -43,104 +43,61 @@ body {
   margin: 20px;
 }
 
-/* ボタンは大きく */
+/* ボタン大きく */
 button {
   font-size: 30px;
   padding: 24px;
   border-radius: 18px;
 }
 </style>
-
 </head>
+
 <body>
 
 <!-- 選択中 -->
 <div id="chosen">番号を選んでください</div>
 
-<!-- 正解表示 -->
+<!-- 結果（ここでは送信しないので基本空） -->
 <div id="result"></div>
 
-<!-- 履歴 -->
+<!-- 履歴（送信後にsend.html側で更新される） -->
 <div id="history"></div>
 
 <!-- ボタン -->
 <div class="grid" id="buttons"></div>
 
 <script>
-/* ★あなたのGAS URLをここに入れる */
-const GAS_URL = "https://script.google.com/macros/s/XXXXXXXXXXXX/exec";
-
-/* プレイヤー名（あだ名OK） */
+/* プレイヤー名 */
 let player = localStorage.getItem("player");
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");
   localStorage.setItem("player", player);
 }
 
-/* 今選んでいる番号 */
-let chosenNumber = null;
-
-/* NFCタグで渡される犬番号 */
-const dog = new URLSearchParams(location.search).get("dog");
-
 /* 表示エリア */
 const chosenDiv = document.getElementById("chosen");
-const resultDiv = document.getElementById("result");
-const historyDiv = document.getElementById("history");
-
-/* ボタン生成（1〜10） */
 const btnArea = document.getElementById("buttons");
 
+/* ボタン生成（1〜10） */
 for (let i = 1; i <= 10; i++) {
+
   const btn = document.createElement("button");
   btn.innerText = i;
 
-  /* 押したら「選択中」になるだけ */
+  /* 押したら選択中になるだけ（送信しない） */
   btn.onclick = () => {
-    chosenNumber = i;
+
+    // ★最強B方式：番号を保存する（send.htmlが読む）
+    localStorage.setItem("selectedNumber", i);
+
+    // 表示更新
     chosenDiv.innerText = `🎯 選択中：${i}番`;
-    resultDiv.innerText = "";
+
   };
 
   btnArea.appendChild(btn);
 }
-
-/* NFCタグをかざした瞬間に送信する */
-async function sendAnswer() {
-
-  if (!chosenNumber) {
-    chosenDiv.innerText = "⚠ 先に番号を選んでください";
-    return;
-  }
-
-  /* GASへ送信 */
-  const res = await fetch(
-    `${GAS_URL}?player=${player}&selected=${chosenNumber}&dog=${dog}`
-  );
-
-  const data = await res.json();
-
-  /* 判定表示 */
-  if (data.result === "correct") {
-    resultDiv.innerText =
-      `🎉 正解！！あなたの答え：${chosenNumber}番（${data.dogName}）`;
-  } else {
-    resultDiv.innerText =
-      `❌ 残念…あなたの答え：${chosenNumber}番（${data.dogName}）`;
-  }
-
-  /* 履歴表示（番号＋犬名） */
-  historyDiv.innerText =
-    `正解した番号：${data.correctNumbers.join(", ")}\n` +
-    `正解した犬：${data.correctDogs.join("、")}`;
-}
-
-/* ページが開いた瞬間に送信する（タグをかざした動作） */
-sendAnswer();
-
 </script>
 
 </body>
 </html>
-
-

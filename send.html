@@ -2,54 +2,71 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>送信中...</title>
-</head>
-<body>
-  <h2>送信中です...</h2>
+  <title>送信</title>
 
-  <script>
-    /* NFCタグ側の dog番号 */
-    const params = new URLSearchParams(location.search);
-    const dog = params.get("dog");
-
-    /* player.html側で選んだ番号 */
-    const selected = localStorage.getItem("selectedNumber");
-
-    /* プレイヤー名 */
-    const player = localStorage.getItem("player") || "test";
-
-    /* 番号が選ばれていない場合 */
-    if (!dog || !selected) {
-      document.body.innerHTML =
-        "<h2>⚠ 番号が選ばれていません</h2>";
-    } else {
-
-      /* ✅あなたのGAS URL */
-      const gasUrl =
-        "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
-
-      /* 判定送信 */
-      fetch(`${gasUrl}?player=${player}&selected=${selected}&dog=${dog}`)
-        .then(res => res.text())
-        .then(result => {
-
-          document.body.innerHTML =
-            result.trim() === "correct"
-              ? "<h2>✅ 正解！</h2>"
-              : "<h2>❌ 不正解</h2>";
-
-          /* 1秒後に戻る */
-          setTimeout(() => {
-            window.history.back();
-          }, 1000);
-
-        })
-        .catch(err => {
-          document.body.innerHTML =
-            "<h2>通信エラー</h2>";
-          console.error(err);
-        });
+  <style>
+    body {
+      font-family: sans-serif;
+      text-align: center;
+      margin-top: 90px;
     }
-  </script>
+
+    .big {
+      font-size: 64px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="big">送信中…</div>
+
+<script>
+  /* NFCタグの犬番号 */
+  const params = new URLSearchParams(location.search);
+  const dog = params.get("dog");
+
+  /* player.htmlで選んだ番号 */
+  const selected = localStorage.getItem("selectedNumber");
+
+  /* プレイヤー名（あだ名） */
+  const player = localStorage.getItem("player");
+
+  /* 番号未選択なら止める */
+  if (!dog || !selected) {
+    document.body.innerHTML =
+      "<div class='big'>⚠ 未選択</div>";
+  } else {
+
+    /* あなたのGAS URL */
+    const gasUrl =
+      "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+
+    /* 判定送信 */
+    fetch(`${gasUrl}?player=${player}&selected=${selected}&dog=${dog}`)
+      .then(res => res.text())
+      .then(result => {
+
+        /* 正解・不正解を巨大表示 */
+        document.body.innerHTML =
+          result.trim() === "correct"
+            ? "<div class='big'>✅ 正解！</div>"
+            : "<div class='big'>❌ 不正解</div>";
+
+        /* ★2秒後に必ず player.html に戻る */
+        setTimeout(() => {
+          window.location.href =
+            "https://eito8888.github.io/nfc-quiz/player.html";
+        }, 2000);
+
+      })
+      .catch(err => {
+        document.body.innerHTML =
+          "<div class='big'>通信エラー</div>";
+        console.error(err);
+      });
+  }
+</script>
+
 </body>
 </html>

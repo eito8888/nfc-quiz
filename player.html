@@ -1,10 +1,8 @@
-<!-- ★2026-02-08 最強B修正版 -->
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>回答画面（最強B方式）</title>
+<title>回答画面（最強B完成版）</title>
 
 <style>
 body {
@@ -14,9 +12,8 @@ body {
   padding: 0;
 }
 
-/* 選択中表示 */
 #chosen {
-  font-size: 34px;
+  font-size: 36px;
   font-weight: bold;
   padding: 15px;
   margin: 15px;
@@ -28,16 +25,19 @@ body {
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
+  gap: 12px;
   margin: 20px;
 }
 
-/* ★電卓型：正方形ボタン */
+/* ★電卓型：押しやすい正方形 */
 button {
-  font-size: 32px;
-  border-radius: 18px;
   width: 100%;
-  aspect-ratio: 1 / 1;   /* 正方形 */
+  aspect-ratio: 1 / 1;
+  font-size: 46px;
+  font-weight: bold;
+  color: black;
+  background: #ffe066;
+  border-radius: 18px;
 }
 </style>
 </head>
@@ -49,9 +49,8 @@ button {
 <div class="grid" id="buttons"></div>
 
 <script>
-/* プレイヤー名（あだ名） */
+/* ★初回だけあだ名入力 */
 let player = localStorage.getItem("player");
-
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");
   localStorage.setItem("player", player);
@@ -61,20 +60,15 @@ if (!player) {
 const chosenDiv = document.getElementById("chosen");
 const btnArea = document.getElementById("buttons");
 
-/* ボタン生成（1〜10） */
+/* ボタン生成 */
 for (let i = 1; i <= 10; i++) {
 
   const btn = document.createElement("button");
   btn.innerText = i;
 
   btn.onclick = () => {
-
-    /* ★選択番号を保存 */
     localStorage.setItem("selectedNumber", i);
-
-    /* 表示更新 */
     chosenDiv.innerText = `🎯 選択中：${i}番`;
-
   };
 
   btnArea.appendChild(btn);
@@ -83,4 +77,3 @@ for (let i = 1; i <= 10; i++) {
 
 </body>
 </html>
-

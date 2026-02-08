@@ -2,13 +2,13 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>送信中...</title>
+<title>判定中...</title>
 
 <style>
 body {
   font-family: sans-serif;
   text-align: center;
-  padding-top: 70px;
+  padding-top: 60px;
 }
 
 h1 {
@@ -17,76 +17,82 @@ h1 {
 }
 
 #msg {
-  font-size: 46px;
+  font-size: 50px;
   font-weight: bold;
   margin-top: 40px;
+}
+
+#backBtn {
+  margin-top: 60px;
+  font-size: 42px;
+  padding: 20px 50px;
+  border-radius: 20px;
+  background: #ffe066;
+  font-weight: bold;
+  border: none;
 }
 </style>
 </head>
 
 <body>
 
-<h1>📡 送信中…</h1>
-<div id="msg"></div>
+<h1>📡 判定中…</h1>
+<div id="msg">送信しています…</div>
+
+<button id="backBtn" onclick="goBack()">
+⬅ 番号選択に戻る
+</button>
 
 <script>
 /* ★あなたのGAS URL */
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
+const msgDiv = document.getElementById("msg");
+
+/* 戻る */
+function goBack() {
+  window.location.href =
+    "https://eito8888.github.io/nfc-quiz/player.html?v=" + Date.now();
+}
+
 /* 保存された情報 */
 const player   = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
-
-/* NFCタグから渡される dog番号 */
-const dog = new URLSearchParams(location.search).get("dog");
-
-/* 表示エリア */
-const msgDiv = document.getElementById("msg");
+const dog      = new URLSearchParams(location.search).get("dog");
 
 /* 番号未選択なら終了 */
 if (!selected) {
-
   msgDiv.innerText = "⚠ 番号が選ばれていません";
+}
 
-  /* 2秒後に戻る */
-  setTimeout(() => {
-    window.location.replace(
-      "https://eito8888.github.io/nfc-quiz/player.html"
-    );
-  }, 2000);
+/* 送信処理（失敗も必ず表示） */
+async function send() {
 
-} else {
-
-  /* 送信処理 */
-  async function send() {
-
+  try {
     const res = await fetch(
       `${GAS_URL}?player=${player}&selected=${selected}&dog=${dog}`
     );
 
     const data = await res.json();
 
-    /* 判定表示 */
     if (data.result === "correct") {
-      msgDiv.innerText = "🎉 正解！";
+      msgDiv.innerText = "🎉 正解！！";
     } else {
-      msgDiv.innerText = "❌ 不正解";
+      msgDiv.innerText = "❌ 不正解…";
     }
 
-    /* ★2秒後に必ず番号画面へ戻る */
-    setTimeout(() => {
+  } catch (e) {
 
-      window.location.replace(
-        "https://eito8888.github.io/nfc-quiz/player.html"
-      );
+    msgDiv.innerText =
+      "⚠ 通信に失敗しました\nもう一度かざしてください";
 
-    }, 2000);
   }
-
-  send();
 }
+
+send();
 </script>
 
 </body>
 </html>
+

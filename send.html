@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>送信中...</title>
+</head>
+<body>
+  <h2>送信中です...</h2>
+
+  <script>
+    // URLから dog番号を取得（NFCタグ側）
+    const params = new URLSearchParams(location.search);
+    const dog = params.get("dog");
+
+    // player.html側で選ばれた番号を取得
+    const selected = localStorage.getItem("selectedNumber");
+
+    // 番号が選ばれていない場合
+    if (!dog || !selected) {
+      document.body.innerHTML =
+        "<h2>送信できません（番号が選ばれていません）</h2>";
+    } else {
+
+      // ✅あなたのGAS URL（完成）
+      const gasUrl =
+        "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+
+      // 判定送信（NFCをかざした瞬間に送信）
+      fetch(`${gasUrl}?player=test&selected=${selected}&dog=${dog}`)
+        .then(res => res.text())
+        .then(result => {
+
+          // 結果表示
+          document.body.innerHTML =
+            result.trim() === "correct"
+              ? "<h2>✅ 正解！</h2>"
+              : "<h2>❌ 不正解</h2>";
+
+          // 1秒後に元の画面へ戻る
+          setTimeout(() => {
+            window.history.back();
+          }, 1000);
+
+        })
+        .catch(err => {
+          document.body.innerHTML =
+            "<h2>通信エラーです</h2>";
+          console.error(err);
+        });
+    }
+  </script>
+</body>
+</html>

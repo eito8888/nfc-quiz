@@ -8,35 +8,37 @@
   <h2>送信中です...</h2>
 
   <script>
-    // URLから dog番号を取得（NFCタグ側）
+    /* NFCタグ側の dog番号 */
     const params = new URLSearchParams(location.search);
     const dog = params.get("dog");
 
-    // player.html側で選ばれた番号を取得
+    /* player.html側で選んだ番号 */
     const selected = localStorage.getItem("selectedNumber");
 
-    // 番号が選ばれていない場合
+    /* プレイヤー名 */
+    const player = localStorage.getItem("player") || "test";
+
+    /* 番号が選ばれていない場合 */
     if (!dog || !selected) {
       document.body.innerHTML =
-        "<h2>送信できません（番号が選ばれていません）</h2>";
+        "<h2>⚠ 番号が選ばれていません</h2>";
     } else {
 
-      // ✅あなたのGAS URL（完成）
+      /* ✅あなたのGAS URL */
       const gasUrl =
         "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
-      // 判定送信（NFCをかざした瞬間に送信）
-      fetch(`${gasUrl}?player=test&selected=${selected}&dog=${dog}`)
+      /* 判定送信 */
+      fetch(`${gasUrl}?player=${player}&selected=${selected}&dog=${dog}`)
         .then(res => res.text())
         .then(result => {
 
-          // 結果表示
           document.body.innerHTML =
             result.trim() === "correct"
               ? "<h2>✅ 正解！</h2>"
               : "<h2>❌ 不正解</h2>";
 
-          // 1秒後に元の画面へ戻る
+          /* 1秒後に戻る */
           setTimeout(() => {
             window.history.back();
           }, 1000);
@@ -44,7 +46,7 @@
         })
         .catch(err => {
           document.body.innerHTML =
-            "<h2>通信エラーです</h2>";
+            "<h2>通信エラー</h2>";
           console.error(err);
         });
     }

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html>
 <head>
   <meta charset="utf-8">
   <title>犬クイズ モニター</title>
@@ -8,74 +8,58 @@
     body {
       font-family: sans-serif;
       text-align: center;
+      margin: 0;
+      padding: 0;
     }
 
     h1 {
       margin: 20px;
-      font-size: 48px;
+      font-size: 42px;
     }
 
-    /* 全体グリッド */
+    /* 10枠表示 */
     .grid {
       display: grid;
       grid-template-columns: repeat(5, 1fr);
-      gap: 18px;
-      padding: 20px;
+      gap: 12px;
+      padding: 15px;
     }
 
-    /* 通常枠 */
+    /* 枠は拡大しない */
     .cell {
-      border: 2px solid #999;
-      border-radius: 15px;
+      border: 3px solid #666;
+      border-radius: 18px;
       padding: 10px;
-      min-height: 120px;
-
-      font-size: 20px;
-      transition: all 0.4s ease; /* ★アニメーション */
+      height: 180px;   /* 正方形寄り */
+      font-size: 22px;
+      overflow: hidden;
     }
 
-    /* 番号と犬名（通常） */
-    .cell .num {
-      font-size: 26px;
+    .num {
+      font-size: 30px;
       font-weight: bold;
     }
 
-    .cell .dog {
+    .name {
+      font-size: 24px;
+      font-weight: bold;
+      margin-bottom: 6px;
+    }
+
+    /* 正解＋あだ名を横並び */
+    .correctRow {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
       font-size: 22px;
+      font-weight: bold;
+      margin-top: 4px;
     }
 
-    /* ✅正解枠：ドン！と巨大化 */
-    .answered {
-      background: #d4f8d4;
-      border: 5px solid green;
-
-      min-height: 200px;      /* ★大きくする */
-      font-weight: 900;
-
-      transform: scale(1.12); /* ★拡大演出 */
-    }
-
-    /* 正解枠の番号は超巨大 */
-    .answered .num {
-      font-size: 52px;
-      font-weight: 900;
-    }
-
-    /* 正解枠の犬名も大きく */
-    .answered .dog {
-      font-size: 32px;
-      font-weight: 800;
-    }
-
-    /* 正解マークも大きく */
-    .answered .mark {
-      font-size: 28px;
-      margin-top: 6px;
-    }
-
-    /* 写真も少し大きく */
+    /* 写真（将来） */
     img {
-      margin-top: 10px;
+      margin-top: 8px;
       width: 110px;
       height: 110px;
       object-fit: cover;
@@ -91,11 +75,9 @@
 <div id="grid" class="grid"></div>
 
 <script>
-/* ★あなたのGAS URL */
 const GAS_URL =
   "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
-/* モニター更新処理 */
 async function load() {
 
   const res = await fetch(GAS_URL + "?mode=monitor");
@@ -106,29 +88,29 @@ async function load() {
 
   data.questions.forEach(q => {
 
-    const num  = q[0];   // 番号
-    const name = q[1];   // 犬名
-    const img  = q[2];   // 写真ファイル名（任意）
+    const num  = q[0];
+    const name = q[1];
+    const img  = q[2];
 
     const div = document.createElement("div");
     div.className = "cell";
 
-    /* 通常表示 */
     div.innerHTML = `
-      <div class="num">${num}</div>
-      <div class="dog">${name}</div>
+      <div class="num">【${num}】</div>
+      <div class="name">${name}</div>
     `;
 
-    /* 正解していたら演出表示 */
     if (data.correctMap[num]) {
 
-      div.classList.add("answered");
+      const winner = data.correctMap[num];
 
       div.innerHTML += `
-        <div class="mark">✅ 正解！</div>
+        <div class="correctRow">
+          <span>✅正解</span>
+          <span>${winner}</span>
+        </div>
       `;
 
-      /* 写真が設定されていれば表示 */
       if (img) {
         div.innerHTML += `<img src="images/${img}">`;
       }
@@ -138,14 +120,9 @@ async function load() {
   });
 }
 
-/* 最初に読み込み */
 load();
-
-/* 3秒ごとに更新（リアルタイム風） */
-setInterval(load, 3000);
-
+setInterval(load, 1500);
 </script>
 
 </body>
 </html>
-

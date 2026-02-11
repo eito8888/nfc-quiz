@@ -2,97 +2,107 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>判定中...</title>
+<title>送信画面</title>
 
 <style>
-body {
-  font-family: sans-serif;
-  text-align: center;
-  padding-top: 60px;
-}
+  body {
+    font-family: sans-serif;
+    text-align: center;
+    margin: 0;
+    padding: 40px;
+  }
 
-h1 {
-  font-size: 52px;
-  font-weight: bold;
-}
+  #msg {
+    font-size: 34px;
+    font-weight: bold;
+    margin-top: 60px;
+  }
 
-#msg {
-  font-size: 50px;
-  font-weight: bold;
-  margin-top: 40px;
-}
+  #sub {
+    font-size: 18px;
+    margin-top: 20px;
+    color: #555;
+  }
 
-#backBtn {
-  margin-top: 60px;
-  font-size: 42px;
-  padding: 20px 50px;
-  border-radius: 20px;
-  background: #ffe066;
-  font-weight: bold;
-  border: none;
-}
+  button {
+    font-size: 26px;
+    padding: 15px 30px;
+    border-radius: 15px;
+    margin-top: 40px;
+  }
 </style>
 </head>
 
 <body>
 
-<h1>📡 判定中…</h1>
-<div id="msg">送信しています…</div>
+<div id="msg">送信中…</div>
+<div id="sub"></div>
 
-<button id="backBtn" onclick="goBack()">
-⬅ 番号選択に戻る
+<button onclick="back()" style="display:none;" id="backBtn">
+戻る
 </button>
 
 <script>
 /* ★あなたのGAS URL */
 const GAS_URL =
-"https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+  "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
-const msgDiv = document.getElementById("msg");
+/* dog番号 */
+const dog = new URLSearchParams(location.search).get("dog");
 
-/* 戻る */
-function goBack() {
-  window.location.href =
-    "https://eito8888.github.io/nfc-quiz/player.html?v=" + Date.now();
+/* 保存された選択番号 */
+const chosen = localStorage.getItem("selectedNumber");
+
+/* あだ名 */
+const player = localStorage.getItem("player") || "参加者";
+
+/* 表示 */
+const msg = document.getElementById("msg");
+const sub = document.getElementById("sub");
+const backBtn = document.getElementById("backBtn");
+
+
+/* 戻る処理 */
+function back() {
+  location.href = "player.html?v=" + Date.now();
 }
 
-/* 保存された情報 */
-const player   = localStorage.getItem("player");
-const selected = localStorage.getItem("selectedNumber");
-const dog      = new URLSearchParams(location.search).get("dog");
-
-/* 番号未選択なら終了 */
-if (!selected) {
-  msgDiv.innerText = "⚠ 番号が選ばれていません";
-}
-
-/* 送信処理（失敗も必ず表示） */
+/* 送信処理 */
 async function send() {
 
+  if (!chosen) {
+    msg.innerText = "番号が選ばれていません";
+    backBtn.style.display = "inline-block";
+    return;
+  }
+
   try {
-    const res = await fetch(
-      `${GAS_URL}?player=${player}&selected=${selected}&dog=${dog}`
+    /* GASへ送信 */
+    await fetch(
+      `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
     );
 
-    const data = await res.json();
+    /* 成功 */
+    msg.innerText = "✅送信完了";
+    sub.innerText = "2秒後に戻ります";
 
-    if (data.result === "correct") {
-      msgDiv.innerText = "🎉 正解！！";
-    } else {
-      msgDiv.innerText = "❌ 不正解…";
-    }
+    /* 2秒後に自動で戻る */
+    setTimeout(back, 2000);
 
-  } catch (e) {
+  } catch (err) {
 
-    msgDiv.innerText =
-      "⚠ 通信に失敗しました\nもう一度かざしてください";
+    /* 通信失敗 */
+    msg.innerText = "⚠ 通信できませんでした";
+    sub.innerText = "もう一度タグをかざしてください";
 
+    backBtn.style.display = "inline-block";
   }
 }
 
+/* 開いた瞬間に送信 */
 send();
+
 </script>
 
 </body>
 </html>
-

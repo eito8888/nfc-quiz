@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>回答画面（最強B方式・完成版）</title>
+<title>回答画面（最強B方式 完成版）</title>
 
 <style>
   body {
@@ -10,9 +10,6 @@
     text-align: center;
     margin: 0;
     padding: 0;
-
-    /* ★Safari通知で隠れないよう上に余白 */
-    padding-top: 45px;
   }
 
   /* ★上部メッセージ枠（大きく安定） */
@@ -27,35 +24,34 @@
     border-radius: 18px;
 
     background: white;
+
+    /* ✅Safari帯に隠れないよう下げる */
+    margin-top: 110px;
   }
 
   /* ★ボタン配置（横4列固定） */
   .grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-
-    gap: 14px;
-    margin: 20px;
+    gap: 18px;
+    margin: 25px;
   }
 
-  /* ★電卓型：正方形ボタン */
+  /* ★電卓型ボタン（押しやすい正方形） */
   button {
-    font-size: 55px;
-    font-weight: bold;
-    color: black;
-
-    background: #ffe766; /* 黄色＋黒文字 */
-
-    border: 2px solid #444;
-    border-radius: 18px;
+    font-size: 50px;          /* 数字を大きく */
+    font-weight: bold;       /* 太字 */
+    border-radius: 20px;
 
     width: 100%;
     aspect-ratio: 1 / 1;
 
-    cursor: pointer;
+    background: #ffe600;     /* 黄色 */
+    color: black;            /* 黒文字 */
+
+    border: 3px solid black;
   }
 
-  /* 押した時の反応 */
   button:active {
     transform: scale(0.95);
   }
@@ -67,43 +63,44 @@
 <!-- 上部表示 -->
 <div id="chosen">番号を選んでください</div>
 
-<!-- ボタン -->
+<!-- ボタン表示 -->
 <div class="grid" id="buttons"></div>
 
 <script>
-  /***********************
-   ★プレイヤー名（初回だけ必ず聞く）
-  ***********************/
-  let player = localStorage.getItem("player");
+/* ================================
+   ★プレイヤー名（初回だけ入力）
+================================ */
+let player = localStorage.getItem("player");
 
-  if (!player || player === "null" || player === "") {
-    player = prompt("名前（あだ名）を入力してください");
-    localStorage.setItem("player", player);
-  }
+if (!player) {
+  player = prompt("名前（あだ名）を入力してください");
+  localStorage.setItem("player", player);
+}
 
-  /***********************
+/* 表示エリア */
+const chosenDiv = document.getElementById("chosen");
+const btnArea   = document.getElementById("buttons");
+
+/* ================================
    ★ボタン生成（1〜10）
-  ***********************/
-  const chosenDiv = document.getElementById("chosen");
-  const btnArea   = document.getElementById("buttons");
+================================ */
+for (let i = 1; i <= 10; i++) {
 
-  for (let i = 1; i <= 10; i++) {
+  const btn = document.createElement("button");
+  btn.innerText = i;
 
-    const btn = document.createElement("button");
-    btn.innerText = i;
+  btn.onclick = () => {
 
-    btn.onclick = () => {
+    /* ★選択番号を保存（send.htmlが読む） */
+    localStorage.setItem("selectedNumber", i);
 
-      /* 選択番号を保存（send.html が読む） */
-      localStorage.setItem("selectedNumber", i);
+    /* ★選択中表示 */
+    chosenDiv.innerText = `🎯 選択中：${i}番`;
 
-      /* 表示更新 */
-      chosenDiv.innerText = `🎯 選択中：${i}番`;
+  };
 
-    };
-
-    btnArea.appendChild(btn);
-  }
+  btnArea.appendChild(btn);
+}
 </script>
 
 </body>

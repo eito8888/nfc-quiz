@@ -1,11 +1,13 @@
 <!DOCTYPE html>
-<html>
+<html lang="ja">
 <head>
   <meta charset="utf-8">
-  <title>最新プレイヤー画面へ</title>
+  <title>最新版へ移動</title>
 
-  <!-- すぐ最新版へ飛ばす -->
-  <meta http-equiv="refresh" content="0; URL=player.html?v=202602151030">
+  <script>
+    // ★毎回自動で最新版になる（キャッシュ無効）
+    location.href = "player.html?v=" + new Date().getTime();
+  </script>
 </head>
 
 <body>

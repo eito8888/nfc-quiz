@@ -1,8 +1,9 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>回答画面（最強B完成版）</title>
+<title>回答画面（最強B方式）</title>
 
 <style>
 body {
@@ -12,63 +13,88 @@ body {
   padding: 0;
 }
 
+/* ★上部表示枠（大きく・目立つ・通知で隠れにくい） */
 #chosen {
-  font-size: 36px;
+  font-size: 44px;         /* ★文字を大きく */
   font-weight: bold;
-  padding: 15px;
-  margin: 15px;
-  border: 3px solid black;
-  border-radius: 15px;
+
+  padding: 45px 20px;      /* ★縦を2〜3倍に */
+  margin: 25px 15px;
+
+  border: 4px solid black;
+  border-radius: 20px;
+
+  background: #fff;
 }
 
-/* ボタン配置（横4列） */
+/* ★ボタン配置（横4列） */
 .grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin: 20px;
+
+  gap: 22px;               /* ★縦横の間隔を広げる */
+  margin: 25px;
 }
 
-/* ★電卓型：押しやすい正方形 */
+/* ★電卓型ボタン（数字を最大級に） */
 button {
-  width: 100%;
-  aspect-ratio: 1 / 1;
-  font-size: 46px;
+  font-size: 55px;         /* ★数字を超大きく */
   font-weight: bold;
   color: black;
-  background: #ffe066;
-  border-radius: 18px;
+
+  background: #ffe766;     /* ★黄色＋黒文字（最強視認性） */
+
+  border: 2px solid #444;
+  border-radius: 20px;
+
+  width: 100%;
+  aspect-ratio: 1 / 1;     /* ★正方形 */
+
+  cursor: pointer;
+}
+
+/* 押した時の反応 */
+button:active {
+  transform: scale(0.95);
 }
 </style>
 </head>
 
 <body>
 
+<!-- 上部メッセージ枠 -->
 <div id="chosen">番号を選んでください</div>
 
+<!-- ボタン -->
 <div class="grid" id="buttons"></div>
 
 <script>
-/* ★初回だけあだ名入力 */
+/* プレイヤー名（初回だけ聞く） */
 let player = localStorage.getItem("player");
+
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");
   localStorage.setItem("player", player);
 }
 
-/* 表示 */
+/* 表示エリア */
 const chosenDiv = document.getElementById("chosen");
-const btnArea = document.getElementById("buttons");
+const btnArea   = document.getElementById("buttons");
 
-/* ボタン生成 */
+/* ボタン生成（1〜10） */
 for (let i = 1; i <= 10; i++) {
 
   const btn = document.createElement("button");
   btn.innerText = i;
 
   btn.onclick = () => {
+
+    /* 選択番号を保存 */
     localStorage.setItem("selectedNumber", i);
+
+    /* ★表示を同じ枠で切り替え */
     chosenDiv.innerText = `🎯 選択中：${i}番`;
+
   };
 
   btnArea.appendChild(btn);

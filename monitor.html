@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>犬クイズ モニター</title>
+<title>クイズ モニター</title>
 
 <style>
   body {
@@ -17,7 +17,6 @@
     font-size: 28px;
   }
 
-  /* ★10問固定：5列×2行（絶対崩れない） */
   .grid {
     display: grid;
     grid-template-columns: repeat(5, 1fr);
@@ -29,37 +28,31 @@
     border: 2px solid #999;
     border-radius: 12px;
     padding: 8px;
-
-    height: 170px;        /* ★高さ固定で縦はみ出し防止 */
+    height: 170px;
     overflow: hidden;
-
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: flex-start;
   }
 
-  /* ★番号＋犬名は1行固定 */
   .title {
     font-weight: bold;
-    font-size: 20px;
-    white-space: nowrap;   /* ★折り返し禁止 */
+    font-size: 18px;
+    white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
   }
 
-  /* 正解＋あだ名（長い場合は縮小） */
   .answerLine {
     font-size: 16px;
     margin-top: 4px;
-
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     max-width: 100%;
   }
 
-  /* ★写真は絶対枠内 */
   img {
     margin-top: 6px;
     width: 100%;
@@ -71,12 +64,15 @@
 
 <body>
 
-<h1>🐶 犬クイズ</h1>
+<h1 id="mainTitle">クイズ</h1>
 <div id="grid" class="grid"></div>
 
 <script>
 const GAS_URL =
   "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+
+/* ★現在表示するステージ（playerと合わせる） */
+const CURRENT_STAGE = 1;
 
 async function load() {
 
@@ -86,24 +82,35 @@ async function load() {
   const grid = document.getElementById("grid");
   grid.innerHTML = "";
 
+  let stageTitle = "";
+
   data.questions.forEach(q => {
 
-    const num  = q[0];
-    const name = q[1];
-    const img  = q[2];
+    const stage    = Number(q[0]);
+    const number   = q[1];
+    const category = q[2];
+    const title    = q[3];
+    const name     = q[4];
+    const img      = q[5];
+
+    if (stage !== CURRENT_STAGE) return;
+
+    stageTitle = title || category || "クイズ";
 
     const div = document.createElement("div");
     div.className = "cell";
 
     div.innerHTML = `
-      <div class="title">【${num}】${name}</div>
+      <div class="title">【${number}】${name}</div>
     `;
 
-    if (data.correctMap[num]) {
+    const key = stage + "-" + number;
+
+    if (data.correctMap[key]) {
 
       div.innerHTML += `
         <div class="answerLine">
-          ✅正解 → ${data.correctMap[num]}
+          ✅正解 → ${data.correctMap[key]}
         </div>
       `;
 
@@ -114,6 +121,8 @@ async function load() {
 
     grid.appendChild(div);
   });
+
+  document.getElementById("mainTitle").innerText = stageTitle;
 }
 
 load();
@@ -122,4 +131,3 @@ setInterval(load, 1500);
 
 </body>
 </html>
-

@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
-<title>回答画面（最強B方式 完成版）</title>
+<title>回答画面</title>
 
 <style>
   body {
@@ -12,24 +12,17 @@
     padding: 0;
   }
 
-  /* ★上部メッセージ枠（大きく安定） */
   #chosen {
     font-size: 40px;
     font-weight: bold;
-
     padding: 35px 15px;
     margin: 20px 15px;
-
     border: 4px solid black;
     border-radius: 18px;
-
     background: white;
-
-    /* ✅Safari帯に隠れないよう下げる */
     margin-top: 230px;
   }
 
-  /* ★ボタン配置（横4列固定） */
   .grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -37,18 +30,14 @@
     margin: 25px;
   }
 
-  /* ★電卓型ボタン（押しやすい正方形） */
   button {
-    font-size: 50px;          /* 数字を大きく */
-    font-weight: bold;       /* 太字 */
+    font-size: 50px;
+    font-weight: bold;
     border-radius: 20px;
-
     width: 100%;
     aspect-ratio: 1 / 1;
-
-    background: #ffe600;     /* 黄色 */
-    color: black;            /* 黒文字 */
-
+    background: #ffe600;
+    color: black;
     border: 3px solid black;
   }
 
@@ -60,15 +49,21 @@
 
 <body>
 
-<!-- 上部表示 -->
 <div id="chosen">番号を選んでください</div>
-
-<!-- ボタン表示 -->
 <div class="grid" id="buttons"></div>
 
 <script>
+
 /* ================================
-   ★プレイヤー名（初回だけ入力）
+   ★現在のステージ（イベントごとに変更）
+================================ */
+const CURRENT_STAGE = 1;  // ←ここを2,3,4…に変えるだけ
+
+localStorage.setItem("currentStage", CURRENT_STAGE);
+
+
+/* ================================
+   ★プレイヤー名
 ================================ */
 let player = localStorage.getItem("player");
 
@@ -77,9 +72,9 @@ if (!player) {
   localStorage.setItem("player", player);
 }
 
-/* 表示エリア */
 const chosenDiv = document.getElementById("chosen");
 const btnArea   = document.getElementById("buttons");
+
 
 /* ================================
    ★ボタン生成（1〜10）
@@ -91,18 +86,16 @@ for (let i = 1; i <= 10; i++) {
 
   btn.onclick = () => {
 
-    /* ★選択番号を保存（send.htmlが読む） */
     localStorage.setItem("selectedNumber", i);
 
-    /* ★選択中表示 */
     chosenDiv.innerText = `🎯 選択中：${i}番`;
 
   };
 
   btnArea.appendChild(btn);
 }
+
 </script>
 
 </body>
 </html>
-

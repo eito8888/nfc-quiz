@@ -48,6 +48,7 @@
   .answerLine {
     font-size: 16px;
     margin-top: 4px;
+
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -96,22 +97,26 @@ async function load() {
     const div = document.createElement("div");
     div.className = "cell";
 
+    /* 問題表示（最初は名前だけ） */
     div.innerHTML = `
       <div class="title">【${number}】${name}</div>
     `;
 
     const key = number;
 
+    /* 正解が出たときだけ表示 */
     if (data.correctMap[key]) {
+
       div.innerHTML += `
         <div class="answerLine">
           ✅正解 → ${data.correctMap[key]}
         </div>
       `;
-    }
 
-    if (img) {
-      div.innerHTML += `<img src="images/${img}">`;
+      /* ★画像も正解時のみ表示 */
+      if (img) {
+        div.innerHTML += `<img src="images/${img}">`;
+      }
     }
 
     grid.appendChild(div);

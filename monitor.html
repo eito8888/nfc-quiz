@@ -102,7 +102,7 @@ async function load() {
       <div class="title">【${number}】${name}</div>
     `;
 
-    const key = number;
+    const key = stage + "-" + number;
 
     /* 正解が出たときだけ表示 */
     if (data.correctMap[key]) {

@@ -1,77 +1,5 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<title>クイズモニター</title>
-
-<style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 0;
-  }
-
-  h1 {
-    margin: 10px;
-    font-size: 28px;
-  }
-
-  .grid {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 12px;
-    padding: 12px;
-  }
-
-  .cell {
-    border: 2px solid #999;
-    border-radius: 12px;
-    padding: 8px;
-    height: 170px;
-    overflow: hidden;
-
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: flex-start;
-  }
-
-  .title {
-    font-weight: bold;
-    font-size: 20px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  .answerLine {
-    font-size: 16px;
-    margin-top: 4px;
-
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  img {
-    margin-top: 6px;
-    width: 100%;
-    height: 95px;
-    object-fit: contain;
-  }
-</style>
-</head>
-
-<body>
-
-<h1 id="mainTitle">クイズ</h1>
-<div id="grid" class="grid"></div>
-
 <script>
-const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+const GAS_URL = "あなたのURL";
 
 async function load() {
 
@@ -85,26 +13,21 @@ async function load() {
 
   data.questions.forEach(q => {
 
-    const stage    = Number(q[0]);
-    const number   = q[1];
-    const category = q[2];
-    const title    = q[3];
-    const name     = q[4];
-    const img      = q[5];
+    const stage  = Number(q[0]);
+    const number = q[1];
+    const title  = q[3];
+    const name   = q[4];
+    const img    = q[5];
 
-    stageTitle = title || category || "クイズ";
+    stageTitle = title || "クイズ";
 
     const div = document.createElement("div");
     div.className = "cell";
 
-    /* 問題表示（最初は名前だけ） */
-    div.innerHTML = `
-      <div class="title">【${number}】${name}</div>
-    `;
+    div.innerHTML = `<div class="title">【${number}】${name}</div>`;
 
     const key = stage + "-" + number;
 
-    /* 正解が出たときだけ表示 */
     if (data.correctMap[key]) {
 
       div.innerHTML += `
@@ -113,7 +36,6 @@ async function load() {
         </div>
       `;
 
-      /* ★画像も正解時のみ表示 */
       if (img) {
         div.innerHTML += `<img src="images/${img}">`;
       }
@@ -128,6 +50,3 @@ async function load() {
 load();
 setInterval(load, 1500);
 </script>
-
-</body>
-</html>

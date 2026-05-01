@@ -49,7 +49,7 @@ const GAS_URL =
   "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
 
 /* ★NFCタグ番号（旧dog） */
-const number = new URLSearchParams(location.search).get("dog");
+const dog = new URLSearchParams(location.search).get("dog");
 
 /* ★選択番号 */
 const chosen = localStorage.getItem("selectedNumber");
@@ -79,8 +79,8 @@ async function send() {
   try {
 
     await fetch(
-      `${GAS_URL}?player=${player}&stage=${stage}&selected=${chosen}&number=${number}`
-    );
+      `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
+);
 
     msg.innerText = "✅送信完了";
     sub.innerText = "2秒後に戻ります";

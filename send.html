@@ -36,15 +36,18 @@ async function send() {
   `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
 );
 
-const data = await res.json();
+const res = await fetch(
+  `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
+);
 
-if (data.result === "correct" || data.result === "wrong") {
+const text = await res.text();
 
+console.log(text);
 
-    msg.innerText = "✅送信完了";
-    sub.innerText = "2秒後に戻ります";
+msg.innerText = "✅送信完了";
+sub.innerText = "2秒後に戻ります";
 
-    setTimeout(back, 2000);
+setTimeout(back, 2000);
 
   } catch (err) {
 

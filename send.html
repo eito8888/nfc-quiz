@@ -1,65 +1,15 @@
-<!DOCTYPE html>
-<html lang="ja">
-<head>
-<meta charset="utf-8">
-<title>送信画面</title>
-
-<style>
-  body {
-    font-family: sans-serif;
-    text-align: center;
-    margin: 0;
-    padding: 40px;
-  }
-
-  #msg {
-    font-size: 34px;
-    font-weight: bold;
-    margin-top: 60px;
-  }
-
-  #sub {
-    font-size: 18px;
-    margin-top: 20px;
-    color: #555;
-  }
-
-  button {
-    font-size: 26px;
-    padding: 15px 30px;
-    border-radius: 15px;
-    margin-top: 40px;
-  }
-</style>
-</head>
-
-<body>
-
-<div id="msg">送信中…</div>
-<div id="sub"></div>
-
-<button onclick="back()" style="display:none;" id="backBtn">
-戻る
-</button>
-
 <script>
 
-/* ★あなたのGAS URL */
-const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+const GAS_URL = "あなたのGAS URL";
 
-/* ★NFCタグ番号（旧dog） */
-const dog = new URLSearchParams(location.search).get("dog");
+/* ★ パラメータ取得（安全版） */
+const params = new URLSearchParams(location.search);
 
-/* ★選択番号 */
-const chosen = localStorage.getItem("selectedNumber");
-
-/* ★現在ステージ */
-const stage = localStorage.getItem("currentStage");
-
-/* ★プレイヤー名 */
+const dog = Number(params.get("dog"));
+const chosen = Number(localStorage.getItem("selectedNumber"));
 const player = localStorage.getItem("player") || "参加者";
 
+/* 表示 */
 const msg = document.getElementById("msg");
 const sub = document.getElementById("sub");
 const backBtn = document.getElementById("backBtn");
@@ -70,8 +20,12 @@ function back() {
 
 async function send() {
 
-  if (!chosen) {
-    msg.innerText = "番号が選ばれていません";
+  /* ★ デバッグ表示 */
+  console.log("dog:", dog);
+  console.log("chosen:", chosen);
+
+  if (!dog || !chosen) {
+    msg.innerText = "値取得エラー（dog または 選択番号）";
     backBtn.style.display = "inline-block";
     return;
   }
@@ -80,7 +34,7 @@ async function send() {
 
     await fetch(
       `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
-);
+    );
 
     msg.innerText = "✅送信完了";
     sub.innerText = "2秒後に戻ります";
@@ -91,6 +45,7 @@ async function send() {
 
     msg.innerText = "⚠ 通信できませんでした";
     sub.innerText = "もう一度タグをかざしてください";
+
     backBtn.style.display = "inline-block";
   }
 }
@@ -98,6 +53,3 @@ async function send() {
 send();
 
 </script>
-
-</body>
-</html>

@@ -1,15 +1,30 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>送信中</title>
+</head>
+
+<body>
+
+<h2 id="msg">送信中...</h2>
+<p id="sub"></p>
+
+<button id="backBtn" onclick="back()" style="display:none;">
+戻る
+</button>
+
 <script>
 
-const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
+const GAS_URL =
+"https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-/* ★ パラメータ取得（安全版） */
 const params = new URLSearchParams(location.search);
 
 const dog = Number(params.get("dog"));
 const chosen = Number(localStorage.getItem("selectedNumber"));
 const player = localStorage.getItem("player") || "参加者";
 
-/* 表示 */
 const msg = document.getElementById("msg");
 const sub = document.getElementById("sub");
 const backBtn = document.getElementById("backBtn");
@@ -20,12 +35,8 @@ function back() {
 
 async function send() {
 
-  /* ★ デバッグ表示 */
-  console.log("dog:", dog);
-  console.log("chosen:", chosen);
-
   if (!dog || !chosen) {
-    msg.innerText = "値取得エラー（dog または 選択番号）";
+    msg.innerText = "値取得エラー";
     backBtn.style.display = "inline-block";
     return;
   }
@@ -33,25 +44,19 @@ async function send() {
   try {
 
     const res = await fetch(
-  `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
-);
+      `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
+    );
 
-const res = await fetch(
-  `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
-);
+    const text = await res.text();
 
-const text = await res.text();
+    msg.innerText = "✅送信完了";
+    sub.innerText = "2秒後に戻ります";
 
-console.log(text);
-
-msg.innerText = "✅送信完了";
-sub.innerText = "2秒後に戻ります";
-
-setTimeout(back, 2000);
+    setTimeout(back, 2000);
 
   } catch (err) {
 
-    msg.innerText = "⚠ 通信できませんでした";
+    msg.innerText = "⚠ 通信エラー";
     sub.innerText = "もう一度タグをかざしてください";
 
     backBtn.style.display = "inline-block";
@@ -61,3 +66,6 @@ setTimeout(back, 2000);
 send();
 
 </script>
+
+</body>
+</html>

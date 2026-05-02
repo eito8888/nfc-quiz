@@ -1,132 +1,131 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="utf-8">
+<meta charset="UTF-8">
 <title>クイズモニター</title>
 
 <style>
 body {
   font-family: sans-serif;
   text-align: center;
-  margin: 0;
 }
 
 h1 {
-  margin: 10px;
-  font-size: 28px;
+  margin-top: 20px;
 }
 
 .grid {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  padding: 12px;
+  gap: 10px;
+  padding: 20px;
 }
 
 .cell {
-  border: 2px solid #999;
-  border-radius: 12px;
-  padding: 8px;
-  height: 170px;
+  border: 1px solid #ccc;
+  padding: 10px;
 }
 
 .title {
   font-weight: bold;
-  font-size: 20px;
+  margin-bottom: 5px;
 }
 
 .answerLine {
-  font-size: 16px;
-  margin-top: 4px;
+  margin-top: 5px;
+  color: green;
 }
 
 img {
-  margin-top: 6px;
   width: 100%;
-  height: 95px;
+  max-height: 150px;
   object-fit: contain;
 }
 </style>
+
 </head>
 
 <body>
 
-<h1 id="mainTitle">読み込み中...</h1>
-<div id="grid" class="grid"></div>
+<h1 id="mainTitle">クイズ</h1>
+
+<div class="grid" id="grid"></div>
 
 <script>
 
 const GAS_URL =
-"https://script.google.com/macros/s/AKfycbysC8_DE3KENuaTbOynEviquqjhPVcSCxXo6zIREjkKnVrYrHdLey4vH0G8ARhHPPOo/exec";
+"https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 async function load() {
 
+  const res = await fetch(GAS_URL);
+  const data = await res.json();
+
   const grid = document.getElementById("grid");
+  grid.innerHTML = "";
 
-  try {
+  let stageTitle = "クイズ";
 
-    const res = await fetch(GAS_URL + "?mode=monitor");
-    const data = await res.json();
+  /* ★ここが今回の核心（correctMapを作る） */
+  let correctMap = {};
 
-    grid.innerHTML = "";
+  data.answers.forEach(row => {
 
-    /* ★ データ0件対策 */
-    if (!data.questions || data.questions.length === 0) {
+    const player   = row[0];
+    const selected = Number(row[1]);
+    const correct  = row[3];
+    const stage    = Number(row[4]);
 
-      document.getElementById("mainTitle").innerText =
-        "⚠ 問題がありません（stageを確認）";
+    if (correct === true || correct === "TRUE") {
 
-      grid.innerHTML =
-        "<h2>questions または stage 設定を確認してください</h2>";
+      const key = stage + "-" + selected;
 
-      return;
-    }
-
-    let stageTitle = "クイズ";
-
-    data.questions.forEach(q => {
-
-      const stage  = Number(q[0]);
-      const number = q[1];
-      const title  = q[3];
-      const name   = q[4];
-      const img    = q[5];
-
-      stageTitle = title || "クイズ";
-
-      const div = document.createElement("div");
-      div.className = "cell";
-
-      div.innerHTML = `<div class="title">【${number}】${name}</div>`;
-
-      const key = stage + "-" + number;
-
-      if (data.correctMap[key]) {
-
-        div.innerHTML += `
-          <div class="answerLine">
-            ✅正解 → ${data.correctMap[key]}
-          </div>
-        `;
-
-        if (img) {
-          div.innerHTML += `<img src="images/${img}">`;
-        }
+      if (!correctMap[key]) {
+        correctMap[key] = player;
       }
 
-      grid.appendChild(div);
-    });
+    }
 
-    document.getElementById("mainTitle").innerText = stageTitle;
+  });
 
-  } catch (err) {
+  /* 問題表示 */
+  data.questions.forEach(q => {
 
-    document.getElementById("mainTitle").innerText =
-      "⚠ GASに接続できません";
+    const stage  = Number(q[0]);
+    const number = q[1];
+    const title  = q[3];
+    const name   = q[4];
+    const img    = q[5];
 
-    grid.innerHTML =
-      "<h2>URLまたはデプロイを確認してください</h2>";
-  }
+    stageTitle = title || "クイズ";
+
+    const div = document.createElement("div");
+    div.className = "cell";
+
+    div.innerHTML = `<div class="title">【${number}】${name}</div>`;
+
+    const key = stage + "-" + number;
+
+    if (correctMap[key]) {
+
+      div.innerHTML += `
+        <div class="answerLine">
+          ✅正解 → ${correctMap[key]}
+        </div>
+      `;
+
+      if (img) {
+        div.innerHTML += `<img src="images/${img}">`;
+      }
+
+    }
+
+    grid.appendChild(div);
+
+  });
+
+  document.getElementById("mainTitle").innerText = stageTitle;
+
 }
 
 load();

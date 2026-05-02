@@ -37,7 +37,10 @@ async function send() {
 
   const stage = localStorage.getItem("stage");
 
-  msg.innerText = "stage = " + stage;
+  msg.innerText =
+  "stage=" + stage +
+  " selected=" + chosen +
+  " dog=" + dog;
 
   console.log("stage:", stage);
 

@@ -35,6 +35,13 @@ function back() {
 
 async function send() {
 
+  const stage = localStorage.getItem("stage");
+
+  msg.innerText = "stage = " + stage;
+
+  console.log("stage:", stage);
+
+  // ↓ ここから元の処理（そのまま）
   if (!dog || !chosen) {
     msg.innerText = "値取得エラー";
     backBtn.style.display = "inline-block";

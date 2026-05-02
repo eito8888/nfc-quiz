@@ -98,6 +98,8 @@ async function load() {
     const name   = q[4];
     const img    = q[5];
 
+　　if (stage !== Number(data.currentStage)) return;
+    
     stageTitle = title || "クイズ";
 
     const div = document.createElement("div");

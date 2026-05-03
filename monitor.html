@@ -24,10 +24,10 @@ h1 {
 
 .cell {
   background: white;
-  border-radius: 20px;           /* ★丸角 */
+  border-radius: 20px;
   box-shadow: 0 4px 10px rgba(0,0,0,0.2);
   padding: 15px;
-  min-height: 220px;             /* ★高さ確保 */
+  min-height: 220px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -75,40 +75,45 @@ async function load() {
 
   let stageTitle = "クイズ";
 
-  /* ★ここが今回の核心（correctMapを作る） */
+  /* =========================
+     正解データマップ作成
+  ========================= */
   let correctMap = {};
 
   data.answers.forEach(row => {
 
-    const player   = row[0];
-    const selected = Number(row[1]);
+    const player   = String(row[0]).trim();
+    const selected = String(row[1]).trim();
     const correct  = row[3];
-    const stage    = Number(row[4]);
+    const stage    = String(row[4]).trim();
 
-    if (correct === true || correct === "TRUE") {
+    const isCorrect =
+      correct === true ||
+      correct === "TRUE" ||
+      correct === "true";
 
+    if (isCorrect) {
       const key = stage + "-" + selected;
 
       if (!correctMap[key]) {
         correctMap[key] = player;
       }
-
     }
-
   });
-  
-  
-  /* 問題表示 */
+
+  /* =========================
+     問題表示
+  ========================= */
   data.questions.forEach(q => {
 
-    const stage  = Number(q[0]);
-    const number = q[1];
+    const stage  = String(q[0]).trim();
+    const number = String(q[1]).trim();
     const title  = q[3];
     const name   = q[4];
     const img    = q[5];
 
-　　if (stage !== Number(data.currentStage)) return;
-    
+    if (stage !== String(data.currentStage).trim()) return;
+
     stageTitle = title || "クイズ";
 
     const div = document.createElement("div");
@@ -129,7 +134,6 @@ async function load() {
       if (img) {
         div.innerHTML += `<img src="images/${img}">`;
       }
-
     }
 
     grid.appendChild(div);

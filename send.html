@@ -1,80 +1,74 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<title>送信中</title>
+<meta charset="utf-8">
+<title>送信中...</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding-top: 60px;
+}
+
+h1 {
+  font-size: 52px;
+}
+
+#msg {
+  font-size: 50px;
+  font-weight: bold;
+  margin-top: 40px;
+}
+
+#backBtn {
+  margin-top: 60px;
+  font-size: 42px;
+  padding: 20px 50px;
+  border-radius: 20px;
+  background: #ffe066;
+  font-weight: bold;
+  border: none;
+}
+</style>
 </head>
 
 <body>
 
-<h2 id="msg">送信中...</h2>
-<p id="sub"></p>
+<h1>📡 送信中…</h1>
+<div id="msg">送信しています…</div>
 
-<button id="backBtn" onclick="back()" style="display:none;">
-戻る
+<button id="backBtn" onclick="goBack()">
+⬅ 番号選択に戻る
 </button>
 
 <script>
-
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const params = new URLSearchParams(location.search);
+const msgDiv = document.getElementById("msg");
 
-const dog = Number(params.get("dog"));
-const chosen = Number(localStorage.getItem("selectedNumber"));
-const player = localStorage.getItem("player") || "参加者";
-
-const msg = document.getElementById("msg");
-const sub = document.getElementById("sub");
-const backBtn = document.getElementById("backBtn");
-
-function back() {
-  location.href = "player.html?v=" + Date.now();
+function goBack() {
+  window.location.href = "player.html?v=" + Date.now();
 }
 
-async function send() {
+const player   = localStorage.getItem("player");
+const selected = localStorage.getItem("selectedNumber");
+const dog      = new URLSearchParams(location.search).get("dog");
+const stage    = localStorage.getItem("stage");
 
-  const stage = localStorage.getItem("stage");
+function send() {
 
-  msg.innerText =
-  "stage=" + stage +
-  " selected=" + chosen +
-  " dog=" + dog;
+  msgDiv.innerText = "📩 送信しました！";
 
-  console.log("stage:", stage);
+  // ★送信だけ（返事は待たない）
+  fetch(
+    `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`
+  );
 
-  // ↓ ここから元の処理（そのまま）
-  if (!dog || !chosen) {
-    msg.innerText = "値取得エラー";
-    backBtn.style.display = "inline-block";
-    return;
-  }
-
-  try {
-
-const res = await fetch(
-  `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}&stage=${stage}`
-);
-
-    const text = await res.text();
-
-    msg.innerText = "✅送信完了";
-    sub.innerText = "2秒後に戻ります";
-
-    setTimeout(back, 2000);
-
-  } catch (err) {
-
-    msg.innerText = "⚠ 通信エラー";
-    sub.innerText = "もう一度タグをかざしてください";
-
-    backBtn.style.display = "inline-block";
-  }
 }
 
 send();
-
 </script>
 
 </body>

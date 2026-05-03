@@ -53,9 +53,9 @@ async function send() {
 
   try {
 
-    const res = await fetch(
-      `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}`
-    );
+const res = await fetch(
+  `${GAS_URL}?player=${player}&selected=${chosen}&dog=${dog}&stage=${stage}`
+);
 
     const text = await res.text();
 

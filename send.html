@@ -61,6 +61,11 @@ function send() {
 
   msgDiv.innerText = "📩 送信しました！";
 
+msg.innerText =
+  "stage=" + stage +
+  " selected=" + selected +
+  " dog=" + dog;
+  
   // ★送信だけ（返事は待たない）
   fetch(
     `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`

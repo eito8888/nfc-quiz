@@ -67,9 +67,18 @@ msg.innerText =
   " dog=" + dog;
   
   // ★送信だけ（返事は待たない）
-  fetch(
-  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`
-);
+  const url =
+  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`;
+
+msg.innerText = url;
+
+fetch(url)
+  .then(() => {
+    msg.innerText = "送信した（fetch通過）";
+  })
+  .catch(() => {
+    msg.innerText = "fetch失敗";
+  });
 
 }
 

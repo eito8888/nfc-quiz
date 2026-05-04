@@ -55,7 +55,7 @@ function goBack() {
 const player   = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
 const dog      = new URLSearchParams(location.search).get("dog");
-const stage    = localStorage.getItem("stage");
+
 
 function send() {
 
@@ -68,8 +68,8 @@ msg.innerText =
   
   // ★送信だけ（返事は待たない）
   fetch(
-    `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`
-  );
+  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`
+);
 
 }
 

@@ -61,10 +61,7 @@ function send() {
 
   msgDiv.innerText = "📩 送信しました！";
 
-msg.innerText =
-  "stage=" + stage +
-  " selected=" + selected +
-  " dog=" + dog;
+
   
   // ★送信だけ（返事は待たない）
   const url =
@@ -72,13 +69,7 @@ msg.innerText =
 
 msg.innerText = url;
 
-fetch(url)
-  .then(() => {
-    msg.innerText = "送信した（fetch通過）";
-  })
-  .catch(() => {
-    msg.innerText = "fetch失敗";
-  });
+
 
 }
 

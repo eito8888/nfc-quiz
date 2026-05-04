@@ -63,11 +63,15 @@ function send() {
 
 
   
-  // ★送信だけ（返事は待たない）
-  const url =
-  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`;
+// ★送信だけ（返事は待たない）
+const stage = localStorage.getItem("stage");
 
-msg.innerText = url;
+const url =
+  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`;
+
+fetch(url);
+
+msg.innerText = "送信しました";
 
 
 

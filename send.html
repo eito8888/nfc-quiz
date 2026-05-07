@@ -52,7 +52,7 @@ function goBack() {
   window.location.href = "player.html?v=" + Date.now();
 }
 
-const player   = localStorage.getItem("player");
+const player = sessionStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
 const dog      = new URLSearchParams(location.search).get("dog");
 

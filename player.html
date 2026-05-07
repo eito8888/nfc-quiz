@@ -58,17 +58,21 @@
    ★現在のステージ（イベントごとに変更）
 ================================ */
 
-
-
-/* ================================
+/* =================================
    ★プレイヤー名
-================================ */
-let player = sessionStorage.getItem("player");
+================================= */
+
+// 新しいゲーム開始時にリセット
+localStorage.removeItem("player");
+
+let player = localStorage.getItem("player");
 
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");
- sessionStorage.setItem ("player", player);
+  localStorage.setItem("player", player);
 }
+
+
 
 const chosenDiv = document.getElementById("chosen");
 const btnArea   = document.getElementById("buttons");

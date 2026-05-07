@@ -67,7 +67,7 @@ let player = localStorage.getItem("player");
 
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");
-  localStorage.setItem("player", player);
+ sessionStorage.setItem ("player", player);
 }
 
 const chosenDiv = document.getElementById("chosen");

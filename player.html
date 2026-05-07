@@ -63,7 +63,7 @@
 /* ================================
    ★プレイヤー名
 ================================ */
-let player = localStorage.getItem("player");
+let player = sessionStorage.getItem("player");
 
 if (!player) {
   player = prompt("名前（あだ名）を入力してください");

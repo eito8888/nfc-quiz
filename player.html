@@ -67,14 +67,26 @@
 // 新しいゲーム開始時にリセット
 
 localStorage.removeItem("player");
+
 let player = localStorage.getItem("player");
 
 if (!player) {
+
   player = prompt("名前（あだ名）を入力してください");
-  localStorage.setItem("player", player);
+
+  // 空欄なら止める
+  if (!player || player.trim() === "") {
+
+    alert("名前を入力してください");
+
+    location.reload();
+
+  } else {
+
+    localStorage.setItem("player", player);
+
+  }
 }
-
-
 
 const chosenDiv = document.getElementById("chosen");
 const btnArea   = document.getElementById("buttons");

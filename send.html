@@ -38,9 +38,7 @@ h1 {
 <h1>📡 送信中…</h1>
 <div id="msg">送信しています…</div>
 
-<button id="backBtn" onclick="goBack()">
-⬅ 番号選択に戻る
-</button>
+
 
 <script>
 const GAS_URL =
@@ -48,9 +46,7 @@ const GAS_URL =
 
 const msgDiv = document.getElementById("msg");
 
-function goBack() {
-  window.location.href = "player.html?v=" + Date.now();
-}
+
 
 const player = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
@@ -59,21 +55,36 @@ const dog      = new URLSearchParams(location.search).get("dog");
 
 function send() {
 
-  msgDiv.innerText = "📩 送信しました！";
+  // まず送信中表示
+  msgDiv.innerText = "📡 送信中…";
 
+  const stage = localStorage.getItem("stage");
 
-  
-// ★送信だけ（返事は待たない）
-const stage = localStorage.getItem("stage");
+  const url =
+    `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`;
 
-const url =
-  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`;
+  fetch(url)
 
-fetch(url);
+    .then(() => {
 
-msg.innerText = "送信しました";
+      // 送信成功
+      msgDiv.innerText = "📩 送信しました！";
 
+      // 1.5秒後に戻る
+      setTimeout(() => {
 
+        location.href = "player.html";
+
+      }, 1500);
+
+    })
+
+    .catch(() => {
+
+      // エラー
+      msgDiv.innerText = "❌ 送信失敗";
+
+    });
 
 }
 

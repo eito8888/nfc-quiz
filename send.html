@@ -58,10 +58,8 @@ function send() {
   // まず送信中表示
   msgDiv.innerText = "📡 送信中…";
 
-  const stage = localStorage.getItem("stage");
-
   const url =
-    `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}&stage=${stage}`;
+  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`;
 
   fetch(url)
 

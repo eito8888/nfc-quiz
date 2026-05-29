@@ -51,6 +51,8 @@ const msgDiv = document.getElementById("msg");
 const player = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
 const dog      = new URLSearchParams(location.search).get("dog");
+const number   = new URLSearchParams(location.search).get("number");
+const tagStage = new URLSearchParams(location.search).get("stage");
 
 
 function send() {

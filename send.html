@@ -60,9 +60,10 @@ function send() {
   // まず送信中表示
   msgDiv.innerText = "📡 送信中…";
 
-  const url =
-  `${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&dog=${dog}`;
+  const sendNumber = number || dog;
 
+const url =
+`${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&number=${sendNumber}&tagStage=${tagStage}`;
   fetch(url)
 
     .then(() => {

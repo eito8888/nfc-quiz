@@ -82,10 +82,16 @@ const url =
 
     .catch(() => {
 
-      // エラー
-      msgDiv.innerText = "❌ 送信失敗";
+  // 応答エラーでも参加者には同じ表示
+  msgDiv.innerText = "📩 送信しました！";
 
-    });
+  setTimeout(() => {
+
+    location.href = "player.html";
+
+  }, 1500);
+
+});
 
 }
 

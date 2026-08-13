@@ -35,43 +35,93 @@ h1 {
 
 <body>
 
-
-
 <h1 id="msg">📡 送信中…</h1>
 
-
 <script>
+
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 const msgDiv = document.getElementById("msg");
 
 
+// ================================
+// プレイヤー情報
+// ================================
 
 const player = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
-const dog      = new URLSearchParams(location.search).get("dog");
-const number   = new URLSearchParams(location.search).get("number");
-const tagStage = new URLSearchParams(location.search).get("stage");
 
+
+// ================================
+// NFCタグの情報
+// ================================
+
+const params = new URLSearchParams(location.search);
+
+const dog = params.get("dog");
+const number = params.get("number");
+const tagStage = params.get("stage");
+
+const sendNumber = number || dog;
+
+
+// ================================
+// 二重送信防止用キー
+// ================================
+
+const sendKey =
+  "sending_" +
+  String(player || "") + "_" +
+  String(selected || "") + "_" +
+  String(sendNumber || "") + "_" +
+  String(tagStage || "");
+
+
+// ================================
+// 送信処理
+// ================================
 
 function send() {
 
-  // まず送信中表示
   msgDiv.innerText = "📡 送信中…";
 
-  const sendNumber = number || dog;
 
-const url =
-`${GAS_URL}?player=${encodeURIComponent(player)}&selected=${selected}&number=${sendNumber}&tagStage=${tagStage}`;
+  // 同じページで送信処理がすでに始まっている場合は
+  // もう一度送信しない
+  if (sessionStorage.getItem(sendKey) === "sending") {
+    return;
+  }
+
+
+  sessionStorage.setItem(sendKey, "sending");
+
+
+  // ================================
+  // GASへ送るURL
+  // ================================
+
+  const url =
+    `${GAS_URL}?player=${encodeURIComponent(player)}` +
+    `&selected=${encodeURIComponent(selected)}` +
+    `&number=${encodeURIComponent(sendNumber)}` +
+    `&tagStage=${encodeURIComponent(tagStage)}`;
+
+
+  // ================================
+  // GASへ送信
+  // ================================
+
   fetch(url)
 
     .then(() => {
 
-      // 送信成功
+      sessionStorage.setItem(sendKey, "sent");
+
       msgDiv.innerText = "📩 送信しました！";
 
-      // 1.5秒後に戻る
+
+      // 1.5秒後に番号選択画面へ戻る
       setTimeout(() => {
 
         location.href = "player.html";
@@ -80,22 +130,40 @@ const url =
 
     })
 
+
     .catch(() => {
 
-  // 応答エラーでも参加者には同じ表示
-  msgDiv.innerText = "📩 送信しました！";
+      /*
+       * GAS側では回答処理が完了していても、
+       * スマホ側で応答を受け取れない場合があります。
+       *
+       * その場合も現在の運用と同じく、
+       * 「送信しました！」として戻ります。
+       */
 
-  setTimeout(() => {
+      sessionStorage.setItem(sendKey, "sent");
 
-    location.href = "player.html";
+      msgDiv.innerText = "📩 送信しました！";
 
-  }, 1500);
 
-});
+      // 1.5秒後に番号選択画面へ戻る
+      setTimeout(() => {
+
+        location.href = "player.html";
+
+      }, 1500);
+
+    });
 
 }
 
+
+// ================================
+// 実行
+// ================================
+
 send();
+
 </script>
 
 </body>

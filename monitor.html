@@ -223,8 +223,12 @@ async function load() {
   }
 }
 
-load();
-setInterval(load, 1500);
+async function monitorLoop() {
+await load();
+setTimeout(monitorLoop, 1500);
+}
+
+monitorLoop();
 </script>
 
 </body>

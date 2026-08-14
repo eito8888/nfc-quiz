@@ -245,7 +245,10 @@ if (currentStage > 0) {
 
     gridHTML += '</div>';
 
+    console.time("写真表示");
     displayArea.innerHTML = gridHTML;
+　　console.timeEnd("写真表示");
+    
     document.getElementById("mainTitle").innerText = stageTitle;
 
   } catch (error) {

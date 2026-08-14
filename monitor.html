@@ -111,7 +111,35 @@ img {
 
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
+let preloadedStage = null;
+let preloadedImages = [];
 
+function preloadImages(questions, currentStage) {
+  if (preloadedStage === currentStage) {
+    return;
+  }
+
+  preloadedStage = currentStage;
+  preloadedImages = [];
+
+  questions.forEach(q => {
+    const stage = String(q[0]).trim();
+    const img = q[5];
+
+    if (stage !== String(currentStage).trim()) {
+      return;
+    }
+
+    if (!img) {
+      return;
+    }
+
+    const image = new Image();
+    image.src = "images/" + img;
+
+    preloadedImages.push(image);
+  });
+}
 async function load() {
   try {
     const res = await fetch(GAS_URL);
@@ -119,7 +147,9 @@ async function load() {
 
     const displayArea = document.getElementById("displayArea");
     const currentStage = Number(data.currentStage);
-
+if (currentStage > 0) {
+  preloadImages(data.questions, currentStage);
+}
     // ==========================================
     // 【Stage = 0】 結果発表画面（合計点一覧）
     // ==========================================

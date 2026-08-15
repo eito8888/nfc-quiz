@@ -239,12 +239,11 @@ if (currentStage > 0) {
           cellContent += `<img src="images/${img}">`;
         }
       }
-
-      gridHTML += `<div class="cell">${cellContent}</div>`;
-    });
-　　
     console.log("7番画像HTML作成:", number, img);
     
+      gridHTML += `<div class="cell">${cellContent}</div>`;
+    });
+　　    
     gridHTML += '</div>';
 
     console.time("写真表示");

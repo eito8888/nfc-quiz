@@ -242,13 +242,19 @@ if (currentStage > 0) {
 
       gridHTML += `<div class="cell">${cellContent}</div>`;
     });
-
+　　
+    console.log("7番画像HTML作成:", number, img);
+    
     gridHTML += '</div>';
 
     console.time("写真表示");
     displayArea.innerHTML = gridHTML;
-　　console.timeEnd("写真表示");
-    
+　　requestAnimationFrame(() => {
+console.log("ブラウザ描画フレーム:", new Date().toLocaleTimeString());
+});
+    console.timeEnd("写真表示");
+    console.log("DOMへ画像挿入完了:", new Date().toLocaleTimeString());
+   
     document.getElementById("mainTitle").innerText = stageTitle;
 
   } catch (error) {

@@ -141,6 +141,7 @@ function preloadImages(questions, currentStage) {
   });
 }
 async function load() {
+console.count("load実行回数");
   try {
     const res = await fetch(GAS_URL);
     const data = await res.json();

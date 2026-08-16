@@ -112,8 +112,7 @@ img {
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-async function load() {
- const preloadedImages = new Set();
+const preloadedImages = new Set();
 
 function preloadImage(src) {
   if (!src || preloadedImages.has(src)) return;
@@ -122,8 +121,8 @@ function preloadImage(src) {
   img.src = src;
   preloadedImages.add(src);
 }
-  
-  
+
+async function load() {
   try {
     const res = await fetch(GAS_URL);
     const data = await res.json();

@@ -112,14 +112,14 @@ img {
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const preloadedImages = new Set();
+const preloadedImages = new Map();
 
 function preloadImage(src) {
   if (!src || preloadedImages.has(src)) return;
 
   const img = new Image();
   img.src = src;
-  preloadedImages.add(src);
+  preloadedImages.set(src, img);
 }
 
 async function load() {
@@ -228,7 +228,7 @@ if (data.questions) {
         `;
         if (img) {
 　       　const imageSrc = "images/" + img;
-           cellContent += `<img src="images/${img}">`;
+           cellContent += `<img src="${preloadedImages.get(imageSrc)?.src || imageSrc}">`;
         }
       }
 

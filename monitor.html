@@ -113,13 +113,35 @@ img {
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 async function load() {
+ const preloadedImages = new Set();
+
+function preloadImage(src) {
+  if (!src || preloadedImages.has(src)) return;
+
+  const img = new Image();
+  img.src = src;
+  preloadedImages.add(src);
+}
+  
+  
   try {
     const res = await fetch(GAS_URL);
     const data = await res.json();
 
     const displayArea = document.getElementById("displayArea");
     const currentStage = Number(data.currentStage);
+// 現在ステージの写真を事前読み込み
+if (data.questions) {
+  data.questions.forEach(q => {
+    const stage = String(q[0]).trim();
+    const img = q[5];
 
+    if (stage === String(currentStage).trim() && img) {
+      preloadImage("images/" + img);
+    }
+  });
+}
+    
     // ==========================================
     // 【Stage = 0】 結果発表画面（合計点一覧）
     // ==========================================

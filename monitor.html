@@ -467,6 +467,30 @@ cellContent += <div class="photo" data-img="${img}"></div> ;
     displayArea.innerHTML =
       gridHTML;
 
+    const photoAreas = displayArea.querySelectorAll(".photo");
+
+photoAreas.forEach(area => {
+const imgName = area.dataset.img;
+const src = "images/" + imgName;
+
+const preloaded = preloadedImages.get(src);
+
+if (preloaded) {
+preloaded.ready.then(() => {
+if (!area.isConnected) {
+return;
+}
+
+  if (area.firstChild) {
+    return;
+  }
+
+
+  area.appendChild(preloaded.image);
+});
+
+}
+});
 
     document.getElementById("mainTitle").innerText =
       stageTitle;

@@ -80,13 +80,8 @@ img {
   padding: 15px;
 }
 
-.score-table th:first-child {
-  border-radius: 10px 0 0 0;
-}
-
-.score-table th:last-child {
-  border-radius: 0 10px 0 0;
-}
+.score-table th:first-child { border-radius: 10px 0 0 0; }
+.score-table th:last-child { border-radius: 0 10px 0 0; }
 
 .score-table td {
   padding: 18px 20px;
@@ -104,20 +99,6 @@ img {
   color: #e65100;
   font-size: 32px;
 }
-
-/* 今回の測定結果表示 */
-#measurement {
-  position: fixed;
-  left: 10px;
-  bottom: 10px;
-  background: rgba(0, 0, 0, 0.8);
-  color: white;
-  padding: 12px 18px;
-  border-radius: 10px;
-  font-size: 18px;
-  z-index: 9999;
-  text-align: left;
-}
 </style>
 
 </head>
@@ -128,516 +109,126 @@ img {
 
 <div id="displayArea"></div>
 
-<div id="measurement">
-測定待機中
-</div>
-
 <script>
-
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-let preloadedStage = null;
-let preloadedImages = new Map();
-
-/* 今回の測定用 */
-let trueDetectedTime = null;
-
-
-/* ==========================================
-   画像先読み
-   ========================================== */
-
-function preloadImages(questions, currentStage) {
-
-  if (preloadedStage === currentStage) {
-    return;
-  }
-
-  preloadedStage = currentStage;
-  preloadedImages = [];
-
-  questions.forEach(q => {
-
-    const stage = String(q[0]).trim();
-    const img = q[5];
-
-    if (stage !== String(currentStage).trim()) {
-      return;
-    }
-
-    if (!img) {
-      return;
-    }
-
-  const image = new Image();
-image.decoding = "async";
-image.src = "images/" + img;
-
-const ready = image.decode
-? image.decode().catch(() => {})
-: new Promise(resolve => {
-if (image.complete) {
-resolve();
-} else {
-image.onload = resolve;
-image.onerror = resolve;
-}
-});
-
-preloadedImages.set(
-"images/" + img,
-{
-image: image,
-ready: ready
-}
-);  
-
-  });
-}
-
-
-/* ==========================================
-   メイン処理
-   ========================================== */
-
 async function load() {
-
   try {
-
     const res = await fetch(GAS_URL);
-
     const data = await res.json();
 
-    const displayArea =
-      document.getElementById("displayArea");
+    const displayArea = document.getElementById("displayArea");
+    const currentStage = Number(data.currentStage);
 
-    const currentStage =
-      Number(data.currentStage);
-
-
-    if (currentStage > 0) {
-
-      preloadImages(
-        data.questions,
-        currentStage
-      );
-
-    }
-
-
-    /* ==========================================
-       Stage = 0
-       結果発表画面
-       ========================================== */
-
+    // ==========================================
+    // 【Stage = 0】 結果発表画面（合計点一覧）
+    // ==========================================
     if (currentStage === 0) {
+      document.getElementById("mainTitle").innerText = "🎉 イベント結果発表 🎉";
 
-      document.getElementById("mainTitle").innerText =
-        "🎉 イベント結果発表 🎉";
-
-      if (
-        !data.scoreList ||
-        data.scoreList.length === 0
-      ) {
-
-        displayArea.innerHTML =
-          `<div class="score-container">
-             <h2>まだ回答データがありません</h2>
-           </div>`;
-
+      if (!data.scoreList || data.scoreList.length === 0) {
+        displayArea.innerHTML = `<div class="score-container"><h2>まだ回答データがありません</h2></div>`;
         return;
       }
 
-
       let tableRows = "";
-
-
       data.scoreList.forEach(item => {
-
         tableRows += `
           <tr>
-            <td style="text-align: left; padding-left: 50px;">
-              ${item.player}
-            </td>
-
-            <td style="text-align: right; padding-right: 50px;">
-              <span class="score-num">
-                ${item.total}
-              </span> 点
-            </td>
+            <td style="text-align: left; padding-left: 50px;">${item.player}</td>
+            <td style="text-align: right; padding-right: 50px;"><span class="score-num">${item.total}</span> 点</td>
           </tr>
         `;
-
       });
-
 
       displayArea.innerHTML = `
         <div class="score-container">
-
           <table class="score-table">
-
             <thead>
-
               <tr>
-
-                <th style="text-align: left; padding-left: 50px;">
-                  ニックネーム
-                </th>
-
-                <th style="text-align: right; padding-right: 50px;">
-                  合計得点
-                </th>
-
+                <th style="text-align: left; padding-left: 50px;">ニックネーム</th>
+                <th style="text-align: right; padding-right: 50px;">合計得点</th>
               </tr>
-
             </thead>
-
             <tbody>
-
               ${tableRows}
-
             </tbody>
-
           </table>
-
         </div>
       `;
-
       return;
     }
 
-
-    /* ==========================================
-       Stage > 0
-       通常問題画面
-       ========================================== */
-
+    // ==========================================
+    // 【Stage > 0】 通常の問題画面
+    // ==========================================
     let stageTitle = "クイズ";
-
     let correctMap = {};
 
-
-    /* ==========================================
-       正解データマップ作成
-       ========================================== */
-
+    /* 正解データマップ作成 */
     data.answers.forEach(row => {
+      const player   = String(row[0]).trim();
+      const selected = String(row[1]).trim();
+      const correct  = row[3];
+      const stage    = String(row[4]).trim();
 
-      const player =
-        String(row[0]).trim();
-
-      const selected =
-        String(row[1]).trim();
-
-      const correct =
-        row[3];
-
-      const stage =
-        String(row[4]).trim();
-
-
-      const isCorrect =
-        (
-          correct === true ||
-          correct === "TRUE" ||
-          correct === "true"
-        );
-
+      const isCorrect = (correct === true || correct === "TRUE" || correct === "true");
 
       if (isCorrect) {
-
-        const key =
-          stage + "-" + selected;
-
-
+        const key = stage + "-" + selected;
         if (!correctMap[key]) {
-
           correctMap[key] = player;
-
         }
-
-
-        /*
-         * 7番の正解を初めて検出した時刻
-         */
-        if (
-          selected === "7" &&
-          stage === String(currentStage).trim() &&
-          trueDetectedTime === null
-        ) {
-
-          trueDetectedTime =
-            performance.now();
-
-          document.getElementById("measurement").innerText =
-            "7番 TRUE検出";
-
-          console.log(
-            "【測定】7番 TRUE検出"
-          );
-
-        }
-
       }
-
     });
 
-
-    /* ==========================================
-       HTML要素構築
-       ========================================== */
-
-    let gridHTML =
-      '<div class="grid">';
-
+    /* HTML要素構築 */
+    let gridHTML = '<div class="grid">';
 
     data.questions.forEach(q => {
+      const stage  = String(q[0]).trim();
+      const number = String(q[1]).trim();
+      const title  = q[3];
+      const name   = q[4];
+      const img    = q[5];
 
-      const stage =
-        String(q[0]).trim();
+      if (stage !== String(currentStage).trim()) return;
 
-      const number =
-        String(q[1]).trim();
+      stageTitle = title || "クイズ";
 
-      const title =
-        q[3];
-
-      const name =
-        q[4];
-
-      const img =
-        q[5];
-
-
-      if (
-        stage !==
-        String(currentStage).trim()
-      ) {
-
-        return;
-
-      }
-
-
-      stageTitle =
-        title || "クイズ";
-
-
-      const key =
-        stage + "-" + number;
-
-
-      let cellContent =
-        `<div class="title">
-          【${number}】${name}
-        </div>`;
-
+      const key = stage + "-" + number;
+      let cellContent = `<div class="title">【${number}】${name}</div>`;
 
       if (correctMap[key]) {
-
         cellContent += `
           <div class="answerLine">
             ✅正解 → ${correctMap[key]}
           </div>
         `;
-
-
-if (img) {
-cellContent += <div class="photo" data-img="${img}"></div> ;
-}
-
+        if (img) {
+          cellContent += `<img src="images/${img}">`;
+        }
       }
 
-
-      gridHTML +=
-        `<div class="cell">
-          ${cellContent}
-        </div>`;
-
+      gridHTML += `<div class="cell">${cellContent}</div>`;
     });
-
 
     gridHTML += '</div>';
 
-
-    /* ==========================================
-       DOMへHTMLを挿入
-       ========================================== */
-
-    displayArea.innerHTML =
-      gridHTML;
-
-    const photoAreas = displayArea.querySelectorAll(".photo");
-
-photoAreas.forEach(area => {
-const imgName = area.dataset.img;
-const src = "images/" + imgName;
-
-const preloaded = preloadedImages.get(src);
-
-if (preloaded) {
-preloaded.ready.then(() => {
-if (!area.isConnected) {
-return;
-}
-
-  if (area.firstChild) {
-    return;
-  }
-
-
-  area.appendChild(preloaded.image);
-});
-
-}
-});
-
-    document.getElementById("mainTitle").innerText =
-      stageTitle;
-
-
-    /* ==========================================
-       7番画像の読み込み測定
-       ========================================== */
-
-    const quizImages =
-      displayArea.querySelectorAll("img");
-
-
-    quizImages.forEach(imgElement => {
-
-      const number =
-        imgElement.dataset.quizNumber;
-
-
-      if (number !== "7") {
-        return;
-      }
-
-
-      /*
-       * 画像がすでに読み込み済みの場合
-       */
-      if (imgElement.complete) {
-
-        const elapsed =
-          trueDetectedTime === null
-            ? "測定不可"
-            : (
-                (performance.now() -
-                 trueDetectedTime) / 1000
-              ).toFixed(2);
-
-
-        document.getElementById("measurement").innerText =
-          `7番画像読み込み済み\nTRUE→画像：約${elapsed}秒`;
-
-
-        console.log(
-          "【測定】7番画像は既に読み込み済み",
-          elapsed + "秒"
-        );
-
-        return;
-      }
-
-
-      /*
-       * 画像の読み込み完了
-       */
-      imgElement.addEventListener(
-        "load",
-        () => {
-
-          const elapsed =
-            trueDetectedTime === null
-              ? "測定不可"
-              : (
-                  (performance.now() -
-                   trueDetectedTime) / 1000
-                ).toFixed(2);
-
-
-          document.getElementById("measurement").innerText =
-            `7番画像表示完了\nTRUE→画像：約${elapsed}秒`;
-
-
-          console.log(
-            "【測定】7番画像表示完了",
-            elapsed + "秒"
-          );
-
-        },
-        { once: true }
-      );
-
-
-      /*
-       * 画像読み込みエラー
-       */
-      imgElement.addEventListener(
-        "error",
-        () => {
-
-          document.getElementById("measurement").innerText =
-            "7番画像読み込みエラー";
-
-
-          console.error(
-            "【測定】7番画像読み込みエラー",
-            imgElement.src
-          );
-
-        },
-        { once: true }
-      );
-
-    });
-
-
-    /*
-     * ブラウザ描画フレーム
-     */
-    requestAnimationFrame(() => {
-
-      console.log(
-        "ブラウザ描画フレーム:",
-        new Date().toLocaleTimeString()
-      );
-
-    });
-
+    displayArea.innerHTML = gridHTML;
+    document.getElementById("mainTitle").innerText = stageTitle;
 
   } catch (error) {
-
-    console.error(
-      "データ取得エラー:",
-      error
-    );
-
+    console.error("データ取得エラー:", error);
   }
-
 }
-
-
-/* ==========================================
-   監視ループ
-   ========================================== */
 
 async function monitorLoop() {
-
-  await load();
-
-  setTimeout(
-    monitorLoop,
-    1500
-  );
-
+await load();
+setTimeout(monitorLoop, 1500);
 }
 
-
 monitorLoop();
-
 </script>
 
 </body>

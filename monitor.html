@@ -137,7 +137,7 @@ img {
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 let preloadedStage = null;
-let preloadedImages = [];
+let preloadedImages = new Map();
 
 /* 今回の測定用 */
 let trueDetectedTime = null;
@@ -169,11 +169,28 @@ function preloadImages(questions, currentStage) {
       return;
     }
 
-    const image = new Image();
+  const image = new Image();
+image.decoding = "async";
+image.src = "images/" + img;
 
-    image.src = "images/" + img;
+const ready = image.decode
+? image.decode().catch(() => {})
+: new Promise(resolve => {
+if (image.complete) {
+resolve();
+} else {
+image.onload = resolve;
+image.onerror = resolve;
+}
+});
 
-    preloadedImages.push(image);
+preloadedImages.set(
+"images/" + img,
+{
+image: image,
+ready: ready
+}
+);  
 
   });
 }
@@ -425,20 +442,9 @@ async function load() {
         `;
 
 
-        if (img) {
-
-          /*
-           * 7番を識別できるようにする
-           */
-          cellContent += `
-            <img
-              src="images/${img}"
-              data-quiz-number="${number}"
-              data-image-name="${img}"
-            >
-          `;
-
-        }
+if (img) {
+cellContent += <div class="photo" data-img="${img}"></div> ;
+}
 
       }
 

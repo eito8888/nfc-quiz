@@ -227,7 +227,8 @@ if (data.questions) {
           </div>
         `;
         if (img) {
-          cellContent += `<img src="images/${img}">`;
+　       　const imageSrc = "images/" + img;
+           cellContent += `<img src="${imageSrc}" loading="eager">`;
         }
       }
 

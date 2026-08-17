@@ -1,3 +1,4 @@
+```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -80,8 +81,13 @@ img {
   padding: 15px;
 }
 
-.score-table th:first-child { border-radius: 10px 0 0 0; }
-.score-table th:last-child { border-radius: 0 10px 0 0; }
+.score-table th:first-child {
+  border-radius: 10px 0 0 0;
+}
+
+.score-table th:last-child {
+  border-radius: 0 10px 0 0;
+}
 
 .score-table td {
   padding: 18px 20px;
@@ -112,6 +118,10 @@ img {
 <script>
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
+/* =========================================================
+   写真先読み
+   ========================================================= */
+
 const preloadedImages = new Map();
 
 function preloadImage(src) {
@@ -122,136 +132,419 @@ function preloadImage(src) {
   preloadedImages.set(src, img);
 }
 
+
+/* =========================================================
+   メイン処理
+   ========================================================= */
+
 async function load() {
+
+  const loadStart = performance.now();
+
   try {
+
+    /* -----------------------------------------
+       ① GAS通信時間を計測
+       ----------------------------------------- */
+
+    const fetchStart = performance.now();
+
     const res = await fetch(GAS_URL);
+
+    const fetchEnd = performance.now();
+
+    /* -----------------------------------------
+       ② JSON解析時間を計測
+       ----------------------------------------- */
+
     const data = await res.json();
+
+    const jsonEnd = performance.now();
+
+    const gasFetchTime = fetchEnd - fetchStart;
+    const jsonTime = jsonEnd - fetchEnd;
+    const dataReceiveTime = jsonEnd - loadStart;
+
+    console.log(
+      "【MONITOR計測】",
+      "GAS取得=" + Math.round(gasFetchTime) + "ms",
+      "JSON解析=" + Math.round(jsonTime) + "ms",
+      "データ受信完了=" + Math.round(dataReceiveTime) + "ms"
+    );
+
 
     const displayArea = document.getElementById("displayArea");
     const currentStage = Number(data.currentStage);
-// 現在ステージの写真を事前読み込み
-if (data.questions) {
-  data.questions.forEach(q => {
-    const stage = String(q[0]).trim();
-    const img = q[5];
 
-    if (stage === String(currentStage).trim() && img) {
-      preloadImage("images/" + img);
+
+    /* -----------------------------------------
+       現在ステージの写真を事前読み込み
+       ----------------------------------------- */
+
+    if (data.questions) {
+
+      data.questions.forEach(q => {
+
+        const stage = String(q[0]).trim();
+        const img = q[5];
+
+        if (
+          stage === String(currentStage).trim() &&
+          img
+        ) {
+          preloadImage("images/" + img);
+        }
+
+      });
+
     }
-  });
-}
-    
-    // ==========================================
-    // 【Stage = 0】 結果発表画面（合計点一覧）
-    // ==========================================
+
+
+    /* =====================================================
+       Stage = 0
+       結果発表画面
+       ===================================================== */
+
     if (currentStage === 0) {
-      document.getElementById("mainTitle").innerText = "🎉 イベント結果発表 🎉";
+
+      document.getElementById("mainTitle").innerText =
+        "🎉 イベント結果発表 🎉";
 
       if (!data.scoreList || data.scoreList.length === 0) {
-        displayArea.innerHTML = `<div class="score-container"><h2>まだ回答データがありません</h2></div>`;
+
+        displayArea.innerHTML =
+          `<div class="score-container">
+             <h2>まだ回答データがありません</h2>
+           </div>`;
+
         return;
       }
 
+
       let tableRows = "";
+
       data.scoreList.forEach(item => {
+
         tableRows += `
           <tr>
-            <td style="text-align: left; padding-left: 50px;">${item.player}</td>
-            <td style="text-align: right; padding-right: 50px;"><span class="score-num">${item.total}</span> 点</td>
+            <td style="text-align: left; padding-left: 50px;">
+              ${item.player}
+            </td>
+            <td style="text-align: right; padding-right: 50px;">
+              <span class="score-num">${item.total}</span> 点
+            </td>
           </tr>
         `;
+
       });
+
 
       displayArea.innerHTML = `
         <div class="score-container">
           <table class="score-table">
             <thead>
               <tr>
-                <th style="text-align: left; padding-left: 50px;">ニックネーム</th>
-                <th style="text-align: right; padding-right: 50px;">合計得点</th>
+                <th style="text-align: left; padding-left: 50px;">
+                  ニックネーム
+                </th>
+                <th style="text-align: right; padding-right: 50px;">
+                  合計得点
+                </th>
               </tr>
             </thead>
+
             <tbody>
               ${tableRows}
             </tbody>
+
           </table>
         </div>
       `;
+
       return;
     }
 
-    // ==========================================
-    // 【Stage > 0】 通常の問題画面
-    // ==========================================
+
+    /* =====================================================
+       Stage > 0
+       通常の問題画面
+       ===================================================== */
+
     let stageTitle = "クイズ";
     let correctMap = {};
 
-    /* 正解データマップ作成 */
-    data.answers.forEach(row => {
-      const player   = String(row[0]).trim();
-      const selected = String(row[1]).trim();
-      const correct  = row[3];
-      const stage    = String(row[4]).trim();
 
-      const isCorrect = (correct === true || correct === "TRUE" || correct === "true");
+    /* -----------------------------------------
+       正解データマップ作成
+       ----------------------------------------- */
 
-      if (isCorrect) {
-        const key = stage + "-" + selected;
-        if (!correctMap[key]) {
-          correctMap[key] = player;
+    if (data.answers) {
+
+      data.answers.forEach(row => {
+
+        const player =
+          String(row[0]).trim();
+
+        const selected =
+          String(row[1]).trim();
+
+        const correct =
+          row[3];
+
+        const stage =
+          String(row[4]).trim();
+
+        const isCorrect =
+          (
+            correct === true ||
+            correct === "TRUE" ||
+            correct === "true"
+          );
+
+
+        if (isCorrect) {
+
+          const key =
+            stage + "-" + selected;
+
+          if (!correctMap[key]) {
+            correctMap[key] = player;
+          }
+
         }
-      }
-    });
 
-    /* HTML要素構築 */
+      });
+
+    }
+
+
+    /* =====================================================
+       HTML構築開始時間
+       ===================================================== */
+
+    const htmlBuildStart = performance.now();
+
+
     let gridHTML = '<div class="grid">';
 
-    data.questions.forEach(q => {
-      const stage  = String(q[0]).trim();
-      const number = String(q[1]).trim();
-      const title  = q[3];
-      const name   = q[4];
-      const img    = q[5];
 
-      if (stage !== String(currentStage).trim()) return;
+    if (data.questions) {
 
-      stageTitle = title || "クイズ";
+      data.questions.forEach(q => {
 
-      const key = stage + "-" + number;
-      let cellContent = `<div class="title">【${number}】${name}</div>`;
+        const stage =
+          String(q[0]).trim();
 
-      if (correctMap[key]) {
-        cellContent += `
-          <div class="answerLine">
-            ✅正解 → ${correctMap[key]}
-          </div>
-        `;
-        if (img) {
-　       　const imageSrc = "images/" + img;
-           cellContent += `<img src="${preloadedImages.get(imageSrc)?.src || imageSrc}">`;
+        const number =
+          String(q[1]).trim();
+
+        const title =
+          q[3];
+
+        const name =
+          q[4];
+
+        const img =
+          q[5];
+
+
+        if (
+          stage !== String(currentStage).trim()
+        ) {
+          return;
         }
-      }
 
-      gridHTML += `<div class="cell">${cellContent}</div>`;
-    });
+
+        stageTitle =
+          title || "クイズ";
+
+
+        const key =
+          stage + "-" + number;
+
+
+        let cellContent =
+          `<div class="title">【${number}】${name}</div>`;
+
+
+        if (correctMap[key]) {
+
+          cellContent += `
+            <div class="answerLine">
+              ✅正解 → ${correctMap[key]}
+            </div>
+          `;
+
+
+          if (img) {
+
+            const imageSrc =
+              "images/" + img;
+
+
+            cellContent +=
+              `<img src="${
+                preloadedImages.get(imageSrc)?.src ||
+                imageSrc
+              }"
+              data-monitor-image="${imageSrc}">`;
+
+          }
+
+        }
+
+
+        gridHTML +=
+          `<div class="cell">${cellContent}</div>`;
+
+      });
+
+    }
+
 
     gridHTML += '</div>';
 
-    displayArea.innerHTML = gridHTML;
-    document.getElementById("mainTitle").innerText = stageTitle;
+
+    const htmlBuildEnd =
+      performance.now();
+
+
+    /* =====================================================
+       画面を書き換える
+       ===================================================== */
+
+    const renderStart =
+      performance.now();
+
+    displayArea.innerHTML =
+      gridHTML;
+
+    document.getElementById("mainTitle").innerText =
+      stageTitle;
+
+    const renderEnd =
+      performance.now();
+
+
+    /* =====================================================
+       画像読み込み時間を計測
+       ===================================================== */
+
+    const imageElements =
+      displayArea.querySelectorAll(
+        "img[data-monitor-image]"
+      );
+
+
+    imageElements.forEach(img => {
+
+      const imageSrc =
+        img.getAttribute("data-monitor-image");
+
+      const imageStart =
+        performance.now();
+
+
+      const reportImageLoad = () => {
+
+        const imageEnd =
+          performance.now();
+
+        console.log(
+          "【PHOTO計測】",
+          imageSrc,
+          "表示用HTML作成=" +
+            Math.round(htmlBuildEnd - htmlBuildStart) +
+            "ms",
+          "画面反映=" +
+            Math.round(renderEnd - renderStart) +
+            "ms",
+          "画像読み込み=" +
+            Math.round(imageEnd - imageStart) +
+            "ms",
+          "load開始から=" +
+            Math.round(imageEnd - loadStart) +
+            "ms"
+        );
+
+      };
+
+
+      if (img.complete) {
+
+        reportImageLoad();
+
+      } else {
+
+        img.addEventListener(
+          "load",
+          reportImageLoad,
+          { once: true }
+        );
+
+        img.addEventListener(
+          "error",
+          () => {
+            console.error(
+              "【PHOTOエラー】",
+              imageSrc
+            );
+          },
+          { once: true }
+        );
+
+      }
+
+    });
+
+
+    /* =====================================================
+       今回のload全体時間
+       ===================================================== */
+
+    const loadEnd =
+      performance.now();
+
+    console.log(
+      "【LOAD全体】",
+      "load開始→画面反映=" +
+        Math.round(loadEnd - loadStart) +
+        "ms"
+    );
+
 
   } catch (error) {
-    console.error("データ取得エラー:", error);
+
+    console.error(
+      "データ取得エラー:",
+      error
+    );
+
   }
+
 }
 
+
+/* =========================================================
+   モニター更新
+   1秒ごと
+   ========================================================= */
+
 async function monitorLoop() {
-await load();
-setTimeout(monitorLoop, 1000);
+
+  await load();
+
+  setTimeout(
+    monitorLoop,
+    1000
+  );
+
 }
 
 monitorLoop();
+
 </script>
 
 </body>
 </html>
+```

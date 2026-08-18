@@ -444,30 +444,39 @@ async function load() {
       const imageStart =
         performance.now();
 
+const reportImageLoad = () => {
 
-      const reportImageLoad = () => {
+  const imageEnd =
+    performance.now();
 
-        const imageEnd =
-          performance.now();
+  const imageLoadTime =
+    imageEnd - imageStart;
 
-        console.log(
-          "【PHOTO計測】",
-          imageSrc,
-          "表示用HTML作成=" +
-            Math.round(htmlBuildEnd - htmlBuildStart) +
-            "ms",
-          "画面反映=" +
-            Math.round(renderEnd - renderStart) +
-            "ms",
-          "画像読み込み=" +
-            Math.round(imageEnd - imageStart) +
-            "ms",
-          "load開始から=" +
-            Math.round(imageEnd - loadStart) +
-            "ms"
-        );
+  const totalTime =
+    imageEnd - loadStart;
 
-      };
+  if (imageLoadTime >= 5000 || totalTime >= 5000) {
+
+    console.warn(
+      "【異常PHOTO計測】",
+      imageSrc,
+      "表示用HTML作成=" +
+        Math.round(htmlBuildEnd - htmlBuildStart) +
+        "ms",
+      "画面反映=" +
+        Math.round(renderEnd - renderStart) +
+        "ms",
+      "画像読み込み=" +
+        Math.round(imageLoadTime) +
+        "ms",
+      "load開始から=" +
+        Math.round(totalTime) +
+        "ms"
+    );
+
+  }
+
+};
 
 
       if (img.complete) {

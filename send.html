@@ -42,39 +42,28 @@ h1 {
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const msgDiv =
-  document.getElementById("msg");
+const msgDiv = document.getElementById("msg");
 
 
 // ================================
 // プレイヤー情報
 // ================================
 
-const player =
-  localStorage.getItem("player");
-
-const selected =
-  localStorage.getItem("selectedNumber");
+const player = localStorage.getItem("player");
+const selected = localStorage.getItem("selectedNumber");
 
 
 // ================================
 // NFCタグの情報
 // ================================
 
-const params =
-  new URLSearchParams(location.search);
+const params = new URLSearchParams(location.search);
 
-const dog =
-  params.get("dog");
+const dog = params.get("dog");
+const number = params.get("number");
+const tagStage = params.get("stage");
 
-const number =
-  params.get("number");
-
-const tagStage =
-  params.get("stage");
-
-const sendNumber =
-  number || dog;
+const sendNumber = number || dog;
 
 
 // ================================
@@ -95,29 +84,17 @@ const sendKey =
 
 function send() {
 
-  msgDiv.innerText =
-    "📡 送信中…";
+  msgDiv.innerText = "📡 送信中…";
 
 
-  // 送信ボタンからの計測開始時刻
-  const clientSendMs =
-    Date.now();
-
-
-  // 同じページで送信処理が
-  // すでに始まっている場合は送信しない
-  if (
-    sessionStorage.getItem(sendKey) ===
-    "sending"
-  ) {
+  // 同じページで送信処理がすでに始まっている場合は
+  // もう一度送信しない
+  if (sessionStorage.getItem(sendKey) === "sending") {
     return;
   }
 
 
-  sessionStorage.setItem(
-    sendKey,
-    "sending"
-  );
+  sessionStorage.setItem(sendKey, "sending");
 
 
   // ================================
@@ -128,8 +105,7 @@ function send() {
     `${GAS_URL}?player=${encodeURIComponent(player)}` +
     `&selected=${encodeURIComponent(selected)}` +
     `&number=${encodeURIComponent(sendNumber)}` +
-    `&tagStage=${encodeURIComponent(tagStage)}` +
-    `&clientSendMs=${encodeURIComponent(clientSendMs)}`;
+    `&tagStage=${encodeURIComponent(tagStage)}`;
 
 
   // ================================
@@ -138,54 +114,17 @@ function send() {
 
   fetch(url)
 
-    .then(response => {
+    .then(() => {
 
-      return response.json();
+      sessionStorage.setItem(sendKey, "sent");
 
-    })
-
-    .then(data => {
-
-      sessionStorage.setItem(
-        sendKey,
-        "sent"
-      );
-
-
-      // 「送信しました」表示時刻
-      const sentDisplayMs =
-        Date.now();
-
-
-      msgDiv.innerText =
-        "📩 送信しました！";
-
-
-      // ================================
-      // 「送信しました」表示時刻を
-      // GASのtiming_logへ保存
-      // ================================
-
-      if (data.answerId) {
-
-        const timingUrl =
-          `${GAS_URL}?event=sentDisplay` +
-          `&answerId=${encodeURIComponent(data.answerId)}` +
-          `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}`;
-
-        fetch(timingUrl)
-          .catch(() => {
-            // 計測送信の失敗では
-            // クイズ動作を止めない
-          });
-      }
+      msgDiv.innerText = "📩 送信しました！";
 
 
       // 1.5秒後に番号選択画面へ戻る
       setTimeout(() => {
 
-        location.href =
-          "player.html";
+        location.href = "player.html";
 
       }, 1500);
 
@@ -198,29 +137,19 @@ function send() {
        * GAS側では回答処理が完了していても、
        * スマホ側で応答を受け取れない場合があります。
        *
-       * 現在の運用と同じく、
+       * その場合も現在の運用と同じく、
        * 「送信しました！」として戻ります。
-       *
-       * ただし、この場合はGASから
-       * answerIdを受け取れていないため、
-       * 「送信しました」時刻の内部保存は行いません。
        */
 
-      sessionStorage.setItem(
-        sendKey,
-        "sent"
-      );
+      sessionStorage.setItem(sendKey, "sent");
 
-
-      msgDiv.innerText =
-        "📩 送信しました！";
+      msgDiv.innerText = "📩 送信しました！";
 
 
       // 1.5秒後に番号選択画面へ戻る
       setTimeout(() => {
 
-        location.href =
-          "player.html";
+        location.href = "player.html";
 
       }, 1500);
 

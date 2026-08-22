@@ -87,9 +87,19 @@ function send() {
   msgDiv.innerText = "📡 送信中…";
 
 
+  // ★原因計測開始
+  const measureStart = performance.now();
+
+  console.log(
+    "【SEND計測】A 送信処理開始",
+    new Date().toISOString()
+  );
+
+
   // 同じページで送信処理がすでに始まっている場合は
   // もう一度送信しない
   if (sessionStorage.getItem(sendKey) === "sending") {
+    console.log("【SEND計測】二重送信防止で中止");
     return;
   }
 
@@ -112,11 +122,29 @@ function send() {
   // GASへ送信
   // ================================
 
+  console.log(
+    "【SEND計測】B fetch開始",
+    (performance.now() - measureStart).toFixed(0) + "ms"
+  );
+
+
   fetch(url)
 
-    .then(() => {
+    .then((response) => {
+
+      // ★GASからfetch応答が返った時点
+      console.log(
+        "【SEND計測】C GASレスポンス受信",
+        (performance.now() - measureStart).toFixed(0) + "ms"
+      );
 
       sessionStorage.setItem(sendKey, "sent");
+
+      // ★「送信しました」表示直前
+      console.log(
+        "【SEND計測】D 送信しました表示",
+        (performance.now() - measureStart).toFixed(0) + "ms"
+      );
 
       msgDiv.innerText = "📩 送信しました！";
 
@@ -131,7 +159,14 @@ function send() {
     })
 
 
-    .catch(() => {
+    .catch((error) => {
+
+      // ★通信エラー時も計測
+      console.log(
+        "【SEND計測】ERROR",
+        (performance.now() - measureStart).toFixed(0) + "ms",
+        error
+      );
 
       /*
        * GAS側では回答処理が完了していても、

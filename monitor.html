@@ -271,6 +271,8 @@ async function load() {
        ===================================================== */
 
     let stageTitle = "クイズ";
+
+    if (!window.lastCorrectKeys) window.lastCorrectKeys = new Set();
     let correctMap = {};
 
 
@@ -317,6 +319,12 @@ async function load() {
 
     }
 
+    Object.keys(correctMap).forEach(key => {
+  if (!window.lastCorrectKeys.has(key)) {
+    console.log("【正解検知】", key, correctMap[key], "検知時刻=" + Math.round(performance.now()) + "ms");
+    window.lastCorrectKeys.add(key);
+  }
+});
 
     /* =====================================================
        HTML構築開始時間

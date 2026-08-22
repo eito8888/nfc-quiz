@@ -1,4 +1,3 @@
-```html
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -56,6 +55,7 @@ img {
   max-height: 140px;
   object-fit: contain;
   margin-top: 10px;
+  display: block;
 }
 
 /* Stage=0 合計スコア表示用スタイル */
@@ -116,439 +116,485 @@ img {
 <div id="displayArea"></div>
 
 <script>
+
 const GAS_URL = "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-/* =========================================================
-   写真先読み
-   ========================================================= */
+/*
+ * GASが一時的に非常に遅くなった場合に、
+ * monitor.htmlまで何十秒も待ち続けないための上限。
+ */
+const FETCH_TIMEOUT_MS = 5000;
 
-const preloadedImages = new Map();
+/*
+ * 画像の先読み状態
+ */
+let preloadedStage = null;
+let preloadedImages = new Map();
 
-function preloadImage(src) {
-  if (!src || preloadedImages.has(src)) return;
+/*
+ * 直前に画面へ表示した内容。
+ * 内容が変わっていない場合はDOMを作り直さない。
+ */
+let lastRenderSignature = "";
 
-  const img = new Image();
-  img.src = src;
-  preloadedImages.set(src, img);
+
+/* ==========================================
+   画像を先読み・デコードする
+   ========================================== */
+
+function preloadImages(questions, currentStage) {
+
+  if (preloadedStage === currentStage) {
+    return;
+  }
+
+  preloadedStage = currentStage;
+  preloadedImages = new Map();
+
+  questions.forEach(q => {
+
+    const stage = String(q[0]).trim();
+    const img = q[5];
+
+    if (stage !== String(currentStage).trim()) {
+      return;
+    }
+
+    if (!img) {
+      return;
+    }
+
+    const src = "images/" + img;
+
+    /*
+     * 同じ画像を二重に先読みしない
+     */
+    if (preloadedImages.has(src)) {
+      return;
+    }
+
+    const image = new Image();
+
+    image.decoding = "async";
+    image.src = src;
+
+    /*
+     * decode()が使えるブラウザでは、
+     * ダウンロード後のデコードまで準備する。
+     *
+     * エラー時もPromiseを拒否状態で残さない。
+     * 先読み失敗がmonitorLoopを止めないため。
+     */
+    const readyPromise =
+      image.decode
+        ? image.decode().catch(() => {})
+        : Promise.resolve();
+
+    preloadedImages.set(src, {
+      image: image,
+      ready: readyPromise
+    });
+
+  });
 }
 
 
-/* =========================================================
-   メイン処理
-   ========================================================= */
+/* ==========================================
+   GASからデータを取得
+   ========================================== */
 
-async function load() {
+async function fetchData() {
 
-  const loadStart = performance.now();
+  const controller = new AbortController();
+
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, FETCH_TIMEOUT_MS);
 
   try {
 
-    /* -----------------------------------------
-       ① GAS通信時間を計測
-       ----------------------------------------- */
+    const res = await fetch(GAS_URL, {
+      signal: controller.signal,
+      cache: "no-store"
+    });
 
-    const fetchStart = performance.now();
-
-    const res = await fetch(GAS_URL);
-
-    const fetchEnd = performance.now();
-
-    /* -----------------------------------------
-       ② JSON解析時間を計測
-       ----------------------------------------- */
+    if (!res.ok) {
+      throw new Error("GAS response status: " + res.status);
+    }
 
     const data = await res.json();
 
-    const jsonEnd = performance.now();
+    return data;
 
-    const gasFetchTime = fetchEnd - fetchStart;
-    const jsonTime = jsonEnd - fetchEnd;
-    const dataReceiveTime = jsonEnd - loadStart;
+  } finally {
 
-    console.log(
-      "【MONITOR計測】",
-      "GAS取得=" + Math.round(gasFetchTime) + "ms",
-      "JSON解析=" + Math.round(jsonTime) + "ms",
-      "データ受信完了=" + Math.round(dataReceiveTime) + "ms"
-    );
+    clearTimeout(timer);
+
+  }
+}
 
 
-    const displayArea = document.getElementById("displayArea");
-    const currentStage = Number(data.currentStage);
+/* ==========================================
+   正解データからMapを作る
+   ========================================== */
+
+function buildCorrectMap(answers) {
+
+  const correctMap = {};
+
+  if (!Array.isArray(answers)) {
+    return correctMap;
+  }
+
+  answers.forEach(row => {
+
+    const player = String(row[0]).trim();
+    const selected = String(row[1]).trim();
+    const correct = row[3];
+    const stage = String(row[4]).trim();
+
+    const isCorrect =
+      (
+        correct === true ||
+        correct === "TRUE" ||
+        correct === "true"
+      );
+
+    if (!isCorrect) {
+      return;
+    }
+
+    const key = stage + "-" + selected;
+
+    /*
+     * 同じ問題に複数人が正解した場合は、
+     * 現在の仕様どおり最初のプレイヤーを表示。
+     */
+    if (!correctMap[key]) {
+      correctMap[key] = player;
+    }
+
+  });
+
+  return correctMap;
+}
 
 
-    /* -----------------------------------------
-       現在ステージの写真を事前読み込み
-       ----------------------------------------- */
+/* ==========================================
+   通常問題画面を作る
+   ========================================== */
 
-    if (data.questions) {
+function renderQuiz(data, currentStage) {
 
-      data.questions.forEach(q => {
+  const displayArea =
+    document.getElementById("displayArea");
 
-        const stage = String(q[0]).trim();
-        const img = q[5];
+  const correctMap =
+    buildCorrectMap(data.answers);
 
-        if (
-          stage === String(currentStage).trim() &&
-          img
-        ) {
-          preloadImage("images/" + img);
-        }
+  let stageTitle = "クイズ";
 
-      });
+  let gridHTML = '<div class="grid">';
+
+  data.questions.forEach(q => {
+
+    const stage = String(q[0]).trim();
+    const number = String(q[1]).trim();
+    const title = q[3];
+    const name = q[4];
+    const img = q[5];
+
+    if (stage !== String(currentStage).trim()) {
+      return;
+    }
+
+    stageTitle = title || "クイズ";
+
+    const key = stage + "-" + number;
+
+    let cellContent =
+      `<div class="title">【${number}】${name}</div>`;
+
+    if (correctMap[key]) {
+
+      cellContent += `
+        <div class="answerLine">
+          ✅正解 → ${correctMap[key]}
+        </div>
+      `;
+
+      if (img) {
+
+        /*
+         * 画像先読み済みでも、通常のimgとして表示する。
+         * ブラウザのキャッシュを利用できるため、
+         * 先読みが完了していれば表示時の通信を避けられる。
+         */
+        cellContent += `
+          <img
+            src="images/${img}"
+            loading="eager"
+            decoding="async"
+            alt=""
+          >
+        `;
+
+      }
+
+    }
+
+    gridHTML += `
+      <div class="cell">
+        ${cellContent}
+      </div>
+    `;
+
+  });
+
+  gridHTML += "</div>";
+
+  displayArea.innerHTML = gridHTML;
+
+  document.getElementById("mainTitle").innerText =
+    stageTitle;
+}
+
+
+/* ==========================================
+   Stage = 0 結果発表画面
+   ========================================== */
+
+function renderScore(data) {
+
+  const displayArea =
+    document.getElementById("displayArea");
+
+  document.getElementById("mainTitle").innerText =
+    "🎉 イベント結果発表 🎉";
+
+  if (
+    !data.scoreList ||
+    data.scoreList.length === 0
+  ) {
+
+    displayArea.innerHTML =
+      `<div class="score-container">
+        <h2>まだ回答データがありません</h2>
+      </div>`;
+
+    return;
+  }
+
+  let tableRows = "";
+
+  data.scoreList.forEach(item => {
+
+    tableRows += `
+      <tr>
+        <td style="text-align: left; padding-left: 50px;">
+          ${item.player}
+        </td>
+
+        <td style="text-align: right; padding-right: 50px;">
+          <span class="score-num">
+            ${item.total}
+          </span> 点
+        </td>
+      </tr>
+    `;
+
+  });
+
+  displayArea.innerHTML = `
+    <div class="score-container">
+
+      <table class="score-table">
+
+        <thead>
+          <tr>
+            <th style="text-align: left; padding-left: 50px;">
+              ニックネーム
+            </th>
+
+            <th style="text-align: right; padding-right: 50px;">
+              合計得点
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          ${tableRows}
+        </tbody>
+
+      </table>
+
+    </div>
+  `;
+}
+
+
+/* ==========================================
+   画面更新が必要か判定
+   ========================================== */
+
+function makeRenderSignature(data, currentStage) {
+
+  if (currentStage === 0) {
+
+    return JSON.stringify({
+      stage: 0,
+      scoreList: data.scoreList || []
+    });
+
+  }
+
+  const correctMap =
+    buildCorrectMap(data.answers);
+
+  const stageQuestions =
+    Array.isArray(data.questions)
+      ? data.questions.filter(q =>
+          String(q[0]).trim() ===
+          String(currentStage).trim()
+        )
+      : [];
+
+  return JSON.stringify({
+    stage: currentStage,
+    questions: stageQuestions,
+    correctMap: correctMap
+  });
+}
+
+
+/* ==========================================
+   メインload
+   ========================================== */
+
+async function load() {
+
+  try {
+
+    const data = await fetchData();
+
+    /*
+     * GASから正常なデータが返ってきた場合だけ
+     * currentStageを使って処理する。
+     */
+    const currentStage =
+      Number(data.currentStage);
+
+    if (!Number.isFinite(currentStage)) {
+      throw new Error("currentStage is invalid");
+    }
+
+
+    /*
+     * Stage > 0 の場合は先に画像先読みを開始。
+     *
+     * ここでは画像の完了を待たない。
+     * 画面更新を画像待ちで止めないため。
+     */
+    if (currentStage > 0) {
+
+      preloadImages(
+        data.questions,
+        currentStage
+      );
 
     }
 
 
-    /* =====================================================
-       Stage = 0
-       結果発表画面
-       ===================================================== */
+    /*
+     * 内容が変わっていない場合、
+     * DOMを作り直さない。
+     *
+     * これにより1.5秒ごとの監視で、
+     * 写真を何度も再配置することを防ぐ。
+     */
+    const signature =
+      makeRenderSignature(
+        data,
+        currentStage
+      );
+
+    if (signature === lastRenderSignature) {
+      return;
+    }
+
+
+    /*
+     * ここから先は本当に画面が変わった場合だけ。
+     */
+    lastRenderSignature = signature;
+
 
     if (currentStage === 0) {
 
-      document.getElementById("mainTitle").innerText =
-        "🎉 イベント結果発表 🎉";
-
-      if (!data.scoreList || data.scoreList.length === 0) {
-
-        displayArea.innerHTML =
-          `<div class="score-container">
-             <h2>まだ回答データがありません</h2>
-           </div>`;
-
-        return;
-      }
-
-
-      let tableRows = "";
-
-      data.scoreList.forEach(item => {
-
-        tableRows += `
-          <tr>
-            <td style="text-align: left; padding-left: 50px;">
-              ${item.player}
-            </td>
-            <td style="text-align: right; padding-right: 50px;">
-              <span class="score-num">${item.total}</span> 点
-            </td>
-          </tr>
-        `;
-
-      });
-
-
-      displayArea.innerHTML = `
-        <div class="score-container">
-          <table class="score-table">
-            <thead>
-              <tr>
-                <th style="text-align: left; padding-left: 50px;">
-                  ニックネーム
-                </th>
-                <th style="text-align: right; padding-right: 50px;">
-                  合計得点
-                </th>
-              </tr>
-            </thead>
-
-            <tbody>
-              ${tableRows}
-            </tbody>
-
-          </table>
-        </div>
-      `;
+      renderScore(data);
 
       return;
     }
 
 
-    /* =====================================================
-       Stage > 0
-       通常の問題画面
-       ===================================================== */
-
-    let stageTitle = "クイズ";
-    let correctMap = {};
-
-
-    /* -----------------------------------------
-       正解データマップ作成
-       ----------------------------------------- */
-
-    if (data.answers) {
-
-      data.answers.forEach(row => {
-
-        const player =
-          String(row[0]).trim();
-
-        const selected =
-          String(row[1]).trim();
-
-        const correct =
-          row[3];
-
-        const stage =
-          String(row[4]).trim();
-
-        const isCorrect =
-          (
-            correct === true ||
-            correct === "TRUE" ||
-            correct === "true"
-          );
-
-
-        if (isCorrect) {
-
-          const key =
-            stage + "-" + selected;
-
-          if (!correctMap[key]) {
-            correctMap[key] = player;
-          }
-
-        }
-
-      });
-
-    }
-
-
-    /* =====================================================
-       HTML構築開始時間
-       ===================================================== */
-
-    const htmlBuildStart = performance.now();
-
-
-    let gridHTML = '<div class="grid">';
-
-
-    if (data.questions) {
-
-      data.questions.forEach(q => {
-
-        const stage =
-          String(q[0]).trim();
-
-        const number =
-          String(q[1]).trim();
-
-        const title =
-          q[3];
-
-        const name =
-          q[4];
-
-        const img =
-          q[5];
-
-
-        if (
-          stage !== String(currentStage).trim()
-        ) {
-          return;
-        }
-
-
-        stageTitle =
-          title || "クイズ";
-
-
-        const key =
-          stage + "-" + number;
-
-
-        let cellContent =
-          `<div class="title">【${number}】${name}</div>`;
-
-
-        if (correctMap[key]) {
-
-          cellContent += `
-            <div class="answerLine">
-              ✅正解 → ${correctMap[key]}
-            </div>
-          `;
-
-
-          if (img) {
-
-            const imageSrc =
-              "images/" + img;
-
-
-            cellContent +=
-              `<img src="${
-                preloadedImages.get(imageSrc)?.src ||
-                imageSrc
-              }"
-              data-monitor-image="${imageSrc}">`;
-
-          }
-
-        }
-
-
-        gridHTML +=
-          `<div class="cell">${cellContent}</div>`;
-
-      });
-
-    }
-
-
-    gridHTML += '</div>';
-
-
-    const htmlBuildEnd =
-      performance.now();
-
-
-    /* =====================================================
-       画面を書き換える
-       ===================================================== */
-
-    const renderStart =
-      performance.now();
-
-    displayArea.innerHTML =
-      gridHTML;
-
-    document.getElementById("mainTitle").innerText =
-      stageTitle;
-
-    const renderEnd =
-      performance.now();
-
-
-    /* =====================================================
-       画像読み込み時間を計測
-       ===================================================== */
-
-    const imageElements =
-      displayArea.querySelectorAll(
-        "img[data-monitor-image]"
-      );
-
-
-    imageElements.forEach(img => {
-
-      const imageSrc =
-        img.getAttribute("data-monitor-image");
-
-      const imageStart =
-        performance.now();
-
-const reportImageLoad = () => {
-
-  const imageEnd =
-    performance.now();
-
-  const imageLoadTime =
-    imageEnd - imageStart;
-
-  const totalTime =
-    imageEnd - loadStart;
-
-  if (imageLoadTime >= 5000 || totalTime >= 5000) {
-
-    console.warn(
-      "【異常PHOTO計測】",
-      imageSrc,
-      "表示用HTML作成=" +
-        Math.round(htmlBuildEnd - htmlBuildStart) +
-        "ms",
-      "画面反映=" +
-        Math.round(renderEnd - renderStart) +
-        "ms",
-      "画像読み込み=" +
-        Math.round(imageLoadTime) +
-        "ms",
-      "load開始から=" +
-        Math.round(totalTime) +
-        "ms"
-    );
-
-  }
-
-};
-
-
-      if (img.complete) {
-
-        reportImageLoad();
-
-      } else {
-
-        img.addEventListener(
-          "load",
-          reportImageLoad,
-          { once: true }
-        );
-
-        img.addEventListener(
-          "error",
-          () => {
-            console.error(
-              "【PHOTOエラー】",
-              imageSrc
-            );
-          },
-          { once: true }
-        );
-
-      }
-
-    });
-
-
-    /* =====================================================
-       今回のload全体時間
-       ===================================================== */
-
-    const loadEnd =
-      performance.now();
-
-    console.log(
-      "【LOAD全体】",
-      "load開始→画面反映=" +
-        Math.round(loadEnd - loadStart) +
-        "ms"
+    renderQuiz(
+      data,
+      currentStage
     );
 
 
   } catch (error) {
 
-    console.error(
-      "データ取得エラー:",
-      error
-    );
+    /*
+     * 通信が失敗・タイムアウトしても、
+     * 現在表示されている画面は消さない。
+     *
+     * 次のmonitorLoopで再取得する。
+     */
+
+    if (error.name === "AbortError") {
+
+      console.warn(
+        "GASへの通信が5秒以内に完了しなかったため、今回の取得を中止しました。現在の画面を維持します。"
+      );
+
+    } else {
+
+      console.warn(
+        "今回のGAS取得に失敗しました。現在の画面を維持します。",
+        error
+      );
+
+    }
 
   }
-
 }
 
 
-/* =========================================================
-   モニター更新
-   1秒ごと
-   ========================================================= */
+/* ==========================================
+   監視ループ
+   ========================================== */
 
 async function monitorLoop() {
 
   await load();
 
+  /*
+   * load()が終わってから1.5秒後に次の確認。
+   *
+   * 前のload()が終わる前に次のload()を開始しない。
+   */
   setTimeout(
     monitorLoop,
-    1000
+    1500
   );
 
 }
+
+
+/* ==========================================
+   開始
+   ========================================== */
 
 monitorLoop();
 
@@ -556,4 +602,3 @@ monitorLoop();
 
 </body>
 </html>
-```

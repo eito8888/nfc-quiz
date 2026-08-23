@@ -78,24 +78,12 @@ img {
   padding: 15px;
 }
 
-.score-table th:first-child {
-  border-radius: 10px 0 0 0;
-}
-
-.score-table th:last-child {
-  border-radius: 0 10px 0 0;
-}
-
 .score-table td {
   padding: 18px 20px;
   font-size: 28px;
   font-weight: bold;
   border-bottom: 1px solid #eee;
   color: #333;
-}
-
-.score-table tr:nth-child(even) {
-  background-color: #fafafa;
 }
 
 .score-num {
@@ -122,33 +110,97 @@ const GAS_URL =
    写真先読み
    ========================================================= */
 
-const preloadedImages = new Map();
+const preloadedImages =
+new Map();
+
 
 function preloadImage(src) {
 
-  if (!src || preloadedImages.has(src)) {
+  if (
+    !src ||
+    preloadedImages.has(src)
+  ) {
     return;
   }
 
-  const img = new Image();
+  const img =
+  new Image();
 
-  img.src = src;
+  img.src =
+  src;
 
-  preloadedImages.set(src, img);
+  preloadedImages.set(
+    src,
+    img
+  );
+
 }
 
 
 /* =========================================================
-   原因追及用状態
+   原因追及記録
    ========================================================= */
 
-let baselineAnswerKeys = null;
+const HISTORY_KEY =
+"NFC_MONITOR_HISTORY";
 
-let targetAnswerKey = null;
+const seenAnswers =
+new Set();
 
-let targetRecord = null;
+let initialized =
+false;
 
-let targetPhotoReported = false;
+let targetAnswerKey =
+null;
+
+let targetRecord =
+null;
+
+let targetPhotoDone =
+false;
+
+
+/* =========================================================
+   自動保存
+   ========================================================= */
+
+function saveMonitorRecord(record) {
+
+  let history = [];
+
+  try {
+
+    history =
+    JSON.parse(
+      localStorage.getItem(
+        HISTORY_KEY
+      ) || "[]"
+    );
+
+  } catch(e) {
+
+    history = [];
+
+  }
+
+
+  history.push(record);
+
+
+  if (history.length > 100) {
+
+    history =
+    history.slice(-100);
+
+  }
+
+
+  localStorage.setItem(
+    HISTORY_KEY,
+    JSON.stringify(history)
+  );
+
+}
 
 
 /* =========================================================
@@ -157,33 +209,34 @@ let targetPhotoReported = false;
 
 function makeAnswerKey(row) {
 
-  return row.map(v => String(v)).join("|");
+  return row
+  .map(v => String(v))
+  .join("|");
 
 }
 
 
 /* =========================================================
-   メイン処理
+   メイン
    ========================================================= */
 
 async function load() {
 
   const loadStart =
-    performance.now();
+  performance.now();
 
 
   try {
 
-    /* =====================================================
-       GAS取得
-       ===================================================== */
-
     const fetchStart =
-      performance.now();
+    performance.now();
 
 
-    const res = await fetch(
-      GAS_URL + "?_=" + Date.now(),
+    const res =
+    await fetch(
+      GAS_URL +
+      "?_=" +
+      Date.now(),
       {
         cache: "no-store"
       }
@@ -191,51 +244,51 @@ async function load() {
 
 
     const fetchEnd =
-      performance.now();
+    performance.now();
 
 
     const data =
-      await res.json();
+    await res.json();
 
 
     const jsonEnd =
-      performance.now();
+    performance.now();
 
 
     const gasFetchTime =
-      fetchEnd - fetchStart;
+    fetchEnd -
+    fetchStart;
 
 
     const jsonTime =
-      jsonEnd - fetchEnd;
+    jsonEnd -
+    fetchEnd;
 
 
     const displayArea =
-      document.getElementById(
-        "displayArea"
-      );
+    document.getElementById(
+      "displayArea"
+    );
 
 
     const currentStage =
-      Number(data.currentStage);
+    Number(
+      data.currentStage
+    );
 
 
     /* =====================================================
-       最初の回答一覧を基準として保存
-       → 過去回答は一切診断しない
+       初回
+       現在存在する回答は全部「過去」とする
        ===================================================== */
 
-    if (baselineAnswerKeys === null) {
-
-      baselineAnswerKeys =
-        new Set();
-
+    if (!initialized) {
 
       if (data.answers) {
 
         data.answers.forEach(row => {
 
-          baselineAnswerKeys.add(
+          seenAnswers.add(
             makeAnswerKey(row)
           );
 
@@ -244,10 +297,14 @@ async function load() {
       }
 
 
+      initialized =
+      true;
+
+
       console.log(
-        "【原因追及】初期回答を基準化",
+        "【原因追及】初期化完了",
         "既存回答=" +
-        baselineAnswerKeys.size +
+        seenAnswers.size +
         "件"
       );
 
@@ -255,10 +312,11 @@ async function load() {
 
 
     /* =====================================================
-       今回新しく追加された回答を1件だけ捕まえる
+       新回答検知
        ===================================================== */
 
     if (
+      initialized &&
       !targetAnswerKey &&
       data.answers
     ) {
@@ -268,60 +326,77 @@ async function load() {
       ) {
 
         const answerKey =
-          makeAnswerKey(row);
+        makeAnswerKey(row);
 
 
         if (
-          !baselineAnswerKeys.has(
+          !seenAnswers.has(
             answerKey
           )
         ) {
 
+          seenAnswers.add(
+            answerKey
+          );
+
+
+          const detectTime =
+          performance.now();
+
+
           const correct =
-            (
-              row[3] === true ||
-              row[3] === "TRUE" ||
-              row[3] === "true"
-            );
+          (
+            row[3] === true ||
+            row[3] === "TRUE" ||
+            row[3] === "true"
+          );
 
 
           targetAnswerKey =
-            answerKey;
+          answerKey;
 
 
           targetRecord = {
 
-            row: row,
+            recordTime:
+            new Date().toISOString(),
 
             player:
-              String(row[0]).trim(),
+            String(row[0]).trim(),
 
             selected:
-              String(row[1]).trim(),
+            String(row[1]).trim(),
 
             dog:
-              String(row[2]).trim(),
+            String(row[2]).trim(),
 
             correct:
-              correct,
+            correct,
 
             stage:
-              String(row[4]).trim(),
+            String(row[4]).trim(),
 
             gasTimestamp:
-              row[5],
+            row[5],
 
-            detectTime:
-              performance.now(),
+            monitorFetch:
+            Math.round(
+              gasFetchTime
+            ),
 
-            fetchTime:
-              gasFetchTime,
+            jsonParse:
+            Math.round(
+              jsonTime
+            ),
 
-            jsonTime:
-              jsonTime,
-
-            loadStart:
+            loadToDetect:
+            Math.round(
+              detectTime -
               loadStart
+            ),
+
+            detectedAt:
+            detectTime
 
           };
 
@@ -332,10 +407,6 @@ async function load() {
 
           console.log(
             "【原因追及 START】"
-          );
-
-          console.log(
-            "今回の回答だけを追跡します"
           );
 
           console.log(
@@ -359,37 +430,30 @@ async function load() {
           );
 
           console.log(
-            "GAS取得=" +
-            Math.round(
-              targetRecord.fetchTime
-            ) +
+            "GAS回答記録時刻=",
+            targetRecord.gasTimestamp
+          );
+
+          console.log(
+            "モニターGAS取得=" +
+            targetRecord.monitorFetch +
             "ms"
           );
 
           console.log(
             "JSON解析=" +
-            Math.round(
-              targetRecord.jsonTime
-            ) +
+            targetRecord.jsonParse +
             "ms"
           );
 
           console.log(
-            "今回の回答をモニターが検知=" +
-            Math.round(
-              targetRecord.detectTime -
-              targetRecord.loadStart
-            ) +
+            "今回load開始→回答検知=" +
+            targetRecord.loadToDetect +
             "ms"
           );
 
           console.log(
-            "GAS回答時刻(row[5])=",
-            targetRecord.gasTimestamp
-          );
-
-          console.log(
-            "【原因追及】この1件を写真表示まで追跡"
+            "【原因追及】今回の1回答を追跡"
           );
 
           console.log(
@@ -415,10 +479,10 @@ async function load() {
       data.questions.forEach(q => {
 
         const stage =
-          String(q[0]).trim();
+        String(q[0]).trim();
 
         const img =
-          q[5];
+        q[5];
 
 
         if (
@@ -442,12 +506,14 @@ async function load() {
        Stage 0
        ===================================================== */
 
-    if (currentStage === 0) {
+    if (
+      currentStage === 0
+    ) {
 
       document.getElementById(
         "mainTitle"
       ).innerText =
-        "🎉 イベント結果発表 🎉";
+      "🎉 イベント結果発表 🎉";
 
 
       if (
@@ -456,21 +522,23 @@ async function load() {
       ) {
 
         displayArea.innerHTML =
-          `<div class="score-container">
-             <h2>まだ回答データがありません</h2>
-           </div>`;
+        `<div class="score-container">
+          <h2>まだ回答データがありません</h2>
+        </div>`;
 
         return;
 
       }
 
 
-      let tableRows = "";
+      let tableRows =
+      "";
 
 
-      data.scoreList.forEach(item => {
+      data.scoreList.forEach(
+        item => {
 
-        tableRows += `
+          tableRows += `
           <tr>
             <td style="text-align:left;padding-left:50px;">
               ${item.player}
@@ -482,35 +550,32 @@ async function load() {
               </span> 点
             </td>
           </tr>
-        `;
+          `;
 
-      });
+        }
+      );
 
 
-      displayArea.innerHTML = `
-        <div class="score-container">
+      displayArea.innerHTML =
+      `
+      <div class="score-container">
 
-          <table class="score-table">
+        <table class="score-table">
 
-            <thead>
-              <tr>
-                <th style="text-align:left;padding-left:50px;">
-                  ニックネーム
-                </th>
+          <thead>
+            <tr>
+              <th>ニックネーム</th>
+              <th>合計得点</th>
+            </tr>
+          </thead>
 
-                <th style="text-align:right;padding-right:50px;">
-                  合計得点
-                </th>
-              </tr>
-            </thead>
+          <tbody>
+            ${tableRows}
+          </tbody>
 
-            <tbody>
-              ${tableRows}
-            </tbody>
+        </table>
 
-          </table>
-
-        </div>
+      </div>
       `;
 
       return;
@@ -522,9 +587,11 @@ async function load() {
        正解マップ
        ===================================================== */
 
-    let correctMap = {};
+    let correctMap =
+    {};
 
-    let stageTitle = "クイズ";
+    let stageTitle =
+    "クイズ";
 
 
     if (data.answers) {
@@ -532,36 +599,38 @@ async function load() {
       data.answers.forEach(row => {
 
         const player =
-          String(row[0]).trim();
+        String(row[0]).trim();
 
         const selected =
-          String(row[1]).trim();
+        String(row[1]).trim();
 
         const correct =
-          row[3];
+        row[3];
 
         const stage =
-          String(row[4]).trim();
+        String(row[4]).trim();
 
 
         const isCorrect =
-          (
-            correct === true ||
-            correct === "TRUE" ||
-            correct === "true"
-          );
+        (
+          correct === true ||
+          correct === "TRUE" ||
+          correct === "true"
+        );
 
 
         if (isCorrect) {
 
           const key =
-            stage + "-" + selected;
+          stage +
+          "-" +
+          selected;
 
 
           if (!correctMap[key]) {
 
             correctMap[key] =
-              player;
+            player;
 
           }
 
@@ -577,11 +646,11 @@ async function load() {
        ===================================================== */
 
     const htmlBuildStart =
-      performance.now();
+    performance.now();
 
 
     let gridHTML =
-      '<div class="grid">';
+    '<div class="grid">';
 
 
     if (data.questions) {
@@ -589,71 +658,73 @@ async function load() {
       data.questions.forEach(q => {
 
         const stage =
-          String(q[0]).trim();
+        String(q[0]).trim();
 
         const number =
-          String(q[1]).trim();
+        String(q[1]).trim();
 
         const title =
-          q[3];
+        q[3];
 
         const name =
-          q[4];
+        q[4];
 
         const img =
-          q[5];
+        q[5];
 
 
         if (
           stage !==
           String(currentStage).trim()
         ) {
-
           return;
-
         }
 
 
         stageTitle =
-          title || "クイズ";
+        title ||
+        "クイズ";
 
 
         const key =
-          stage + "-" + number;
+        stage +
+        "-" +
+        number;
 
 
         let cellContent =
-          `<div class="title">
-             【${number}】${name}
-           </div>`;
+        `<div class="title">
+          【${number}】${name}
+        </div>`;
 
 
         if (correctMap[key]) {
 
           cellContent += `
-            <div class="answerLine">
-              ✅正解 → ${correctMap[key]}
-            </div>
+          <div class="answerLine">
+            ✅正解 → ${correctMap[key]}
+          </div>
           `;
 
 
           if (img) {
 
             const imageSrc =
-              "images/" + img;
+            "images/" +
+            img;
 
 
             cellContent +=
-              `<img
-                src="${
-                  preloadedImages.get(
-                    imageSrc
-                  )?.src ||
+            `<img
+              src="${
+                preloadedImages.get(
                   imageSrc
-                }"
-                data-monitor-image="${imageSrc}"
-                data-monitor-key="${key}"
-              >`;
+                )?.src ||
+                imageSrc
+              }"
+              data-monitor-image="${imageSrc}"
+              data-monitor-key="${key}"
+            >`;
 
           }
 
@@ -661,9 +732,9 @@ async function load() {
 
 
         gridHTML +=
-          `<div class="cell">
-             ${cellContent}
-           </div>`;
+        `<div class="cell">
+          ${cellContent}
+        </div>`;
 
       });
 
@@ -671,11 +742,11 @@ async function load() {
 
 
     gridHTML +=
-      "</div>";
+    "</div>";
 
 
     const htmlBuildEnd =
-      performance.now();
+    performance.now();
 
 
     /* =====================================================
@@ -683,74 +754,114 @@ async function load() {
        ===================================================== */
 
     const renderStart =
-      performance.now();
+    performance.now();
 
 
     displayArea.innerHTML =
-      gridHTML;
+    gridHTML;
 
 
     document.getElementById(
       "mainTitle"
     ).innerText =
-      stageTitle;
+    stageTitle;
 
 
     const renderEnd =
-      performance.now();
+    performance.now();
 
 
     /* =====================================================
-       今回の回答に対応する写真だけ追跡
+       今回の回答の写真を追跡
        ===================================================== */
 
     if (
       targetRecord &&
       targetRecord.correct &&
-      !targetPhotoReported
+      !targetPhotoDone
     ) {
 
       const targetKey =
-        targetRecord.stage +
-        "-" +
-        targetRecord.selected;
+      targetRecord.stage +
+      "-" +
+      targetRecord.selected;
 
 
       const targetImage =
-        displayArea.querySelector(
-          `img[data-monitor-key="${targetKey}"]`
-        );
+      displayArea.querySelector(
+        `img[data-monitor-key="${targetKey}"]`
+      );
 
 
       if (targetImage) {
 
         const photoStart =
-          performance.now();
+        performance.now();
 
 
-        const reportTargetPhoto = () => {
+        const finishPhoto =
+        () => {
 
-          if (targetPhotoReported) {
+          if (
+            targetPhotoDone
+          ) {
             return;
           }
 
 
-          targetPhotoReported =
-            true;
+          targetPhotoDone =
+          true;
 
 
           const photoEnd =
-            performance.now();
+          performance.now();
 
 
-          const photoTime =
-            photoEnd -
-            photoStart;
+          const detectToPhoto =
+          photoEnd -
+          targetRecord.detectedAt;
 
 
-          const monitorDetectToPhoto =
-            photoEnd -
-            targetRecord.detectTime;
+          const photoWait =
+          photoEnd -
+          photoStart;
+
+
+          const record = {
+
+            ...targetRecord,
+
+            htmlBuild:
+            Math.round(
+              htmlBuildEnd -
+              htmlBuildStart
+            ),
+
+            render:
+            Math.round(
+              renderEnd -
+              renderStart
+            ),
+
+            detectToPhoto:
+            Math.round(
+              detectToPhoto
+            ),
+
+            photoWait:
+            Math.round(
+              photoWait
+            ),
+
+            completedAt:
+            new Date().toISOString()
+
+          };
+
+
+          saveMonitorRecord(
+            record
+          );
 
 
           console.log(
@@ -763,61 +874,51 @@ async function load() {
 
           console.log(
             "番号=" +
-            targetRecord.selected
+            record.selected
           );
 
           console.log(
-            "GAS取得=" +
-            Math.round(
-              targetRecord.fetchTime
-            ) +
+            "モニターGAS取得=" +
+            record.monitorFetch +
             "ms"
           );
 
           console.log(
             "JSON解析=" +
-            Math.round(
-              targetRecord.jsonTime
-            ) +
+            record.jsonParse +
             "ms"
           );
 
           console.log(
-            "モニター検知→写真=" +
-            Math.round(
-              monitorDetectToPhoto
-            ) +
+            "回答検知→写真=" +
+            record.detectToPhoto +
             "ms"
           );
 
           console.log(
-            "今回の写真読み込み=" +
-            Math.round(
-              photoTime
-            ) +
+            "写真待ち=" +
+            record.photoWait +
             "ms"
           );
 
           console.log(
             "HTML構築=" +
-            Math.round(
-              htmlBuildEnd -
-              htmlBuildStart
-            ) +
+            record.htmlBuild +
             "ms"
           );
 
           console.log(
             "画面反映=" +
-            Math.round(
-              renderEnd -
-              renderStart
-            ) +
+            record.render +
             "ms"
           );
 
           console.log(
             "【原因追及 END】"
+          );
+
+          console.log(
+            "自動保存済み"
           );
 
           console.log(
@@ -827,20 +928,17 @@ async function load() {
         };
 
 
-        if (targetImage.complete) {
+        if (
+          targetImage.complete
+        ) {
 
-          /*
-           * 今回は先読み済み画像の可能性がある。
-           * completeなら、画像そのものの待ち時間は0ms。
-           */
-          reportTargetPhoto();
-
+          finishPhoto();
 
         } else {
 
           targetImage.addEventListener(
             "load",
-            reportTargetPhoto,
+            finishPhoto,
             { once: true }
           );
 
@@ -865,7 +963,7 @@ async function load() {
     }
 
 
-  } catch (error) {
+  } catch(error) {
 
     console.error(
       "【MONITORエラー】",
@@ -878,7 +976,7 @@ async function load() {
 
 
 /* =========================================================
-   1秒ごと更新
+   1秒更新
    ========================================================= */
 
 async function monitorLoop() {

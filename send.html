@@ -21,14 +21,11 @@ h1 {
   margin-top: 40px;
 }
 
-#backBtn {
-  margin-top: 60px;
-  font-size: 42px;
-  padding: 20px 50px;
-  border-radius: 20px;
-  background: #ffe066;
+#debug {
+  margin-top: 40px;
+  font-size: 28px;
+  line-height: 1.6;
   font-weight: bold;
-  border: none;
 }
 </style>
 </head>
@@ -37,12 +34,15 @@ h1 {
 
 <h1 id="msg">📡 送信中…</h1>
 
+<div id="debug"></div>
+
 <script>
 
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 const msgDiv = document.getElementById("msg");
+const debugDiv = document.getElementById("debug");
 
 const player = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
@@ -62,17 +62,18 @@ const sendKey =
   String(sendNumber || "") + "_" +
   String(tagStage || "");
 
+function showDebug(text) {
+  debugDiv.innerText = text;
+}
+
 function send() {
 
   const measureStart = performance.now();
 
-  console.log(
-    "【SEND計測】A 送信処理開始",
-    new Date().toISOString()
-  );
+  showDebug("計測開始");
 
   if (sessionStorage.getItem(sendKey) === "sending") {
-    console.log("【SEND計測】二重送信防止で中止");
+    showDebug("二重送信防止");
     return;
   }
 
@@ -85,10 +86,7 @@ function send() {
     `&tagStage=${encodeURIComponent(tagStage)}` +
     `&_=${Date.now()}`;
 
-  console.log(
-    "【SEND計測】B fetch開始",
-    (performance.now() - measureStart).toFixed(0) + "ms"
-  );
+  const fetchStart = performance.now();
 
   fetch(url, {
     method: "GET",
@@ -96,18 +94,26 @@ function send() {
   })
   .then((response) => {
 
-    console.log(
-      "【SEND計測】C GASレスポンス受信",
-      (performance.now() - measureStart).toFixed(0) + "ms"
-    );
+    const responseTime =
+      performance.now() - measureStart;
 
     sessionStorage.setItem(sendKey, "sent");
 
     msgDiv.innerText = "📩 送信しました！";
 
-    console.log(
-      "【SEND計測】D 送信しました表示",
-      (performance.now() - measureStart).toFixed(0) + "ms"
+    const displayTime =
+      performance.now() - measureStart;
+
+    showDebug(
+      "fetch開始 → GAS応答：約 " +
+      (responseTime - (fetchStart - measureStart)).toFixed(0) +
+      " ms\n" +
+      "送信開始 → GAS応答：約 " +
+      responseTime.toFixed(0) +
+      " ms\n" +
+      "送信開始 →「送信しました」表示：約 " +
+      displayTime.toFixed(0) +
+      " ms"
     );
 
     setTimeout(() => {
@@ -117,15 +123,19 @@ function send() {
   })
   .catch((error) => {
 
-    console.log(
-      "【SEND計測】ERROR",
-      (performance.now() - measureStart).toFixed(0) + "ms",
-      error
-    );
+    const errorTime =
+      performance.now() - measureStart;
 
     sessionStorage.setItem(sendKey, "sent");
 
     msgDiv.innerText = "📩 送信しました！";
+
+    showDebug(
+      "通信ERROR\n" +
+      "送信開始 → ERROR：約 " +
+      errorTime.toFixed(0) +
+      " ms"
+    );
 
     setTimeout(() => {
       location.href = "player.html";

@@ -44,18 +44,8 @@ const GAS_URL =
 
 const msgDiv = document.getElementById("msg");
 
-
-// ================================
-// プレイヤー情報
-// ================================
-
 const player = localStorage.getItem("player");
 const selected = localStorage.getItem("selectedNumber");
-
-
-// ================================
-// NFCタグの情報
-// ================================
 
 const params = new URLSearchParams(location.search);
 
@@ -65,11 +55,6 @@ const tagStage = params.get("stage");
 
 const sendNumber = number || dog;
 
-
-// ================================
-// 二重送信防止用キー
-// ================================
-
 const sendKey =
   "sending_" +
   String(player || "") + "_" +
@@ -77,17 +62,8 @@ const sendKey =
   String(sendNumber || "") + "_" +
   String(tagStage || "");
 
-
-// ================================
-// 送信処理
-// ================================
-
 function send() {
 
-  msgDiv.innerText = "📡 送信中…";
-
-
-  // ★原因計測開始
   const measureStart = performance.now();
 
   console.log(
@@ -95,107 +71,68 @@ function send() {
     new Date().toISOString()
   );
 
-
-  // 同じページで送信処理がすでに始まっている場合は
-  // もう一度送信しない
   if (sessionStorage.getItem(sendKey) === "sending") {
     console.log("【SEND計測】二重送信防止で中止");
     return;
   }
 
-
   sessionStorage.setItem(sendKey, "sending");
-
-
-  // ================================
-  // GASへ送るURL
-  // ================================
 
   const url =
     `${GAS_URL}?player=${encodeURIComponent(player)}` +
     `&selected=${encodeURIComponent(selected)}` +
     `&number=${encodeURIComponent(sendNumber)}` +
-    `&tagStage=${encodeURIComponent(tagStage)}`;
-
-
-  // ================================
-  // GASへ送信
-  // ================================
+    `&tagStage=${encodeURIComponent(tagStage)}` +
+    `&_=${Date.now()}`;
 
   console.log(
     "【SEND計測】B fetch開始",
     (performance.now() - measureStart).toFixed(0) + "ms"
   );
 
+  fetch(url, {
+    method: "GET",
+    cache: "no-store"
+  })
+  .then((response) => {
 
-  fetch(url)
+    console.log(
+      "【SEND計測】C GASレスポンス受信",
+      (performance.now() - measureStart).toFixed(0) + "ms"
+    );
 
-    .then((response) => {
+    sessionStorage.setItem(sendKey, "sent");
 
-      // ★GASからfetch応答が返った時点
-      console.log(
-        "【SEND計測】C GASレスポンス受信",
-        (performance.now() - measureStart).toFixed(0) + "ms"
-      );
+    msgDiv.innerText = "📩 送信しました！";
 
-      sessionStorage.setItem(sendKey, "sent");
+    console.log(
+      "【SEND計測】D 送信しました表示",
+      (performance.now() - measureStart).toFixed(0) + "ms"
+    );
 
-      // ★「送信しました」表示直前
-      console.log(
-        "【SEND計測】D 送信しました表示",
-        (performance.now() - measureStart).toFixed(0) + "ms"
-      );
+    setTimeout(() => {
+      location.href = "player.html";
+    }, 1500);
 
-      msgDiv.innerText = "📩 送信しました！";
+  })
+  .catch((error) => {
 
+    console.log(
+      "【SEND計測】ERROR",
+      (performance.now() - measureStart).toFixed(0) + "ms",
+      error
+    );
 
-      // 1.5秒後に番号選択画面へ戻る
-      setTimeout(() => {
+    sessionStorage.setItem(sendKey, "sent");
 
-        location.href = "player.html";
+    msgDiv.innerText = "📩 送信しました！";
 
-      }, 1500);
+    setTimeout(() => {
+      location.href = "player.html";
+    }, 1500);
 
-    })
-
-
-    .catch((error) => {
-
-      // ★通信エラー時も計測
-      console.log(
-        "【SEND計測】ERROR",
-        (performance.now() - measureStart).toFixed(0) + "ms",
-        error
-      );
-
-      /*
-       * GAS側では回答処理が完了していても、
-       * スマホ側で応答を受け取れない場合があります。
-       *
-       * その場合も現在の運用と同じく、
-       * 「送信しました！」として戻ります。
-       */
-
-      sessionStorage.setItem(sendKey, "sent");
-
-      msgDiv.innerText = "📩 送信しました！";
-
-
-      // 1.5秒後に番号選択画面へ戻る
-      setTimeout(() => {
-
-        location.href = "player.html";
-
-      }, 1500);
-
-    });
-
+  });
 }
-
-
-// ================================
-// 実行
-// ================================
 
 send();
 

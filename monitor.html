@@ -319,12 +319,55 @@ async function load() {
 
     }
 
-    Object.keys(correctMap).forEach(key => {
-  if (!window.lastCorrectKeys.has(key)) {
-    console.log("【正解検知】", key, correctMap[key], "検知時刻=" + Math.round(performance.now()) + "ms");
-    window.lastCorrectKeys.add(key);
+/* =====================================================
+   新しい回答の検知時間を計測
+   ===================================================== */
+
+if (!window.answerKeys) {
+  window.answerKeys = new Set();
+
+  if (data.answers) {
+    data.answers.forEach(row => {
+      window.answerKeys.add(
+        row.map(v => String(v)).join("|")
+      );
+    });
   }
-});
+
+} else {
+
+  if (data.answers) {
+
+    data.answers.forEach(row => {
+
+      const key =
+        row.map(v => String(v)).join("|");
+
+      if (!window.answerKeys.has(key)) {
+
+        console.log(
+          "【新回答検知】",
+          "player=" + row[0],
+          "selected=" + row[1],
+          "dog=" + row[2],
+          "correct=" + row[3],
+          "stage=" + row[4],
+          "検知時刻=" +
+            Math.round(performance.now()) +
+            "ms",
+          "今回load開始から=" +
+            Math.round(performance.now() - loadStart) +
+            "ms"
+        );
+
+        window.answerKeys.add(key);
+      }
+
+    });
+
+  }
+
+}
 
     /* =====================================================
        HTML構築開始時間

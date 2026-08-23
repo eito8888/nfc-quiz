@@ -24,8 +24,9 @@ h1 {
 #debug {
   margin-top: 40px;
   font-size: 28px;
-  line-height: 1.6;
+  line-height: 1.8;
   font-weight: bold;
+  white-space: pre-line;
 }
 </style>
 </head>
@@ -33,7 +34,6 @@ h1 {
 <body>
 
 <h1 id="msg">📡 送信中…</h1>
-
 <div id="debug"></div>
 
 <script>
@@ -62,18 +62,14 @@ const sendKey =
   String(sendNumber || "") + "_" +
   String(tagStage || "");
 
-function showDebug(text) {
-  debugDiv.innerText = text;
-}
-
 function send() {
 
-  const measureStart = performance.now();
+  const start = performance.now();
 
-  showDebug("計測開始");
+  debugDiv.innerText = "計測開始";
 
   if (sessionStorage.getItem(sendKey) === "sending") {
-    showDebug("二重送信防止");
+    debugDiv.innerText = "二重送信防止";
     return;
   }
 
@@ -94,53 +90,38 @@ function send() {
   })
   .then((response) => {
 
-    const responseTime =
-      performance.now() - measureStart;
+    const responseTime = performance.now() - start;
+    const fetchTime = performance.now() - fetchStart;
 
     sessionStorage.setItem(sendKey, "sent");
 
     msgDiv.innerText = "📩 送信しました！";
 
-    const displayTime =
-      performance.now() - measureStart;
+    const displayTime = performance.now() - start;
 
-    showDebug(
+    debugDiv.innerText =
       "fetch開始 → GAS応答：約 " +
-      (responseTime - (fetchStart - measureStart)).toFixed(0) +
-      " ms\n" +
-      "送信開始 → GAS応答：約 " +
-      responseTime.toFixed(0) +
-      " ms\n" +
-      "送信開始 →「送信しました」表示：約 " +
-      displayTime.toFixed(0) +
-      " ms"
-    );
+      fetchTime.toFixed(0) + " ms\n\n" +
 
-    setTimeout(() => {
-      location.href = "player.html";
-    }, 1500);
+      "送信開始 → GAS応答：約 " +
+      responseTime.toFixed(0) + " ms\n\n" +
+
+      "送信開始 →「送信しました」表示：約 " +
+      displayTime.toFixed(0) + " ms";
 
   })
   .catch((error) => {
 
-    const errorTime =
-      performance.now() - measureStart;
+    const errorTime = performance.now() - start;
 
     sessionStorage.setItem(sendKey, "sent");
 
     msgDiv.innerText = "📩 送信しました！";
 
-    showDebug(
-      "通信ERROR\n" +
+    debugDiv.innerText =
+      "通信ERROR\n\n" +
       "送信開始 → ERROR：約 " +
-      errorTime.toFixed(0) +
-      " ms"
-    );
-
-    setTimeout(() => {
-      location.href = "player.html";
-    }, 1500);
-
+      errorTime.toFixed(0) + " ms";
   });
 }
 

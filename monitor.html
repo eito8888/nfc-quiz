@@ -78,6 +78,14 @@ img {
   padding: 15px;
 }
 
+.score-table th:first-child {
+  border-radius: 10px 0 0 0;
+}
+
+.score-table th:last-child {
+  border-radius: 0 10px 0 0;
+}
+
 .score-table td {
   padding: 18px 20px;
   font-size: 28px;
@@ -86,11 +94,16 @@ img {
   color: #333;
 }
 
+.score-table tr:nth-child(even) {
+  background-color: #fafafa;
+}
+
 .score-num {
   color: #e65100;
   font-size: 32px;
 }
 </style>
+
 </head>
 
 <body>
@@ -129,70 +142,82 @@ function preloadImage(src) {
    原因追及用
    ========================================================= */
 
-const HISTORY_KEY =
-"NFC_MONITOR_DIAGNOSTIC_HISTORY";
+if (!window.answerKeys) {
+  window.answerKeys = new Set();
+}
 
-const seenAnswers = new Set();
+if (!window.diagnosticAnswers) {
+  window.diagnosticAnswers = new Map();
+}
 
-let initialized = false;
-
-let targetAnswerKey = null;
-
-let targetRecord = null;
-
-let targetPhotoDone = false;
+if (!window.monitorTimingSent) {
+  window.monitorTimingSent = new Set();
+}
 
 
 /* =========================================================
-   自動保存
+   Monitor計測をGASへ保存
    ========================================================= */
 
-function saveDiagnostic(record) {
+function sendMonitorTiming(
+  answerId,
+  monitorFetchMs,
+  trueDisplayMs,
+  photoDisplayMs
+) {
 
-  let history = [];
+  if (!answerId) {
+    return;
+  }
 
-  try {
+  if (window.monitorTimingSent.has(answerId)) {
+    return;
+  }
 
-    history = JSON.parse(
-      localStorage.getItem(HISTORY_KEY) || "[]"
+  window.monitorTimingSent.add(answerId);
+
+
+  const url =
+    GAS_URL +
+    "?event=monitorTiming" +
+    "&answerId=" +
+    encodeURIComponent(answerId) +
+    "&monitorFetchMs=" +
+    encodeURIComponent(monitorFetchMs) +
+    "&trueDisplayMs=" +
+    encodeURIComponent(trueDisplayMs) +
+    "&photoDisplayMs=" +
+    encodeURIComponent(photoDisplayMs) +
+    "&_=" +
+    Date.now();
+
+
+  fetch(url, {
+    method: "GET",
+    cache: "no-store"
+  })
+  .then(() => {
+
+    console.log(
+      "【原因追及 timing_log送信完了】",
+      "answerId=" + answerId
     );
 
-  } catch (e) {
+  })
+  .catch(error => {
 
-    history = [];
+    console.error(
+      "【原因追及 timing_log送信エラー】",
+      error
+    );
 
-  }
-
-  history.push(record);
-
-  if (history.length > 100) {
-
-    history = history.slice(-100);
-
-  }
-
-  localStorage.setItem(
-    HISTORY_KEY,
-    JSON.stringify(history)
-  );
-}
-
-
-/* =========================================================
-   回答キー
-   ========================================================= */
-
-function makeAnswerKey(row) {
-
-  return row.map(
-    v => String(v)
-  ).join("|");
+  });
 
 }
 
 
 /* =========================================================
-   メイン
+   メイン処理
    ========================================================= */
 
 async function load() {
@@ -200,23 +225,36 @@ async function load() {
   const loadStart =
     performance.now();
 
-  const fetchStart =
-    performance.now();
-
   try {
 
-    const res = await fetch(
-      GAS_URL + "?_=" + Date.now(),
-      {
-        cache: "no-store"
-      }
-    );
+    /* -----------------------------------------
+       ① GAS通信時間
+       ----------------------------------------- */
+
+    const fetchStart =
+      performance.now();
+
+
+    const res =
+      await fetch(
+        GAS_URL,
+        {
+          cache: "no-store"
+        }
+      );
+
 
     const fetchEnd =
       performance.now();
 
+
+    /* -----------------------------------------
+       ② JSON解析
+       ----------------------------------------- */
+
     const data =
       await res.json();
+
 
     const jsonEnd =
       performance.now();
@@ -228,15 +266,32 @@ async function load() {
     const jsonTime =
       jsonEnd - fetchEnd;
 
+    const dataReceiveTime =
+      jsonEnd - loadStart;
+
+
+    /*
+       timing_log用の「Monitor取得時刻」
+
+       JSONを受け取り終わった瞬間の
+       実時刻を保存する。
+    */
+
+    const monitorFetchMs =
+      Date.now();
+
 
     console.log(
       "【MONITOR計測】",
       "GAS取得=" +
-      Math.round(gasFetchTime) +
-      "ms",
+        Math.round(gasFetchTime) +
+        "ms",
       "JSON解析=" +
-      Math.round(jsonTime) +
-      "ms"
+        Math.round(jsonTime) +
+        "ms",
+      "データ受信完了=" +
+        Math.round(dataReceiveTime) +
+        "ms"
     );
 
 
@@ -250,189 +305,9 @@ async function load() {
       Number(data.currentStage);
 
 
-    /* =====================================================
-       初回読み込み
-       既存回答は履歴として登録
-       ===================================================== */
-
-    if (!initialized) {
-
-      if (data.answers) {
-
-        data.answers.forEach(row => {
-
-          seenAnswers.add(
-            makeAnswerKey(row)
-          );
-
-        });
-
-      }
-
-      initialized = true;
-
-      console.log(
-        "【原因追及】初期化完了",
-        "既存回答=" +
-        seenAnswers.size +
-        "件"
-      );
-
-    }
-
-
-    /* =====================================================
-       新しい回答を検知
-       ===================================================== */
-
-    if (
-      !targetAnswerKey &&
-      data.answers
-    ) {
-
-      for (
-        const row of data.answers
-      ) {
-
-        const answerKey =
-          makeAnswerKey(row);
-
-
-        if (
-          !seenAnswers.has(answerKey)
-        ) {
-
-          seenAnswers.add(answerKey);
-
-
-          const detectTime =
-            performance.now();
-
-
-          const correct =
-            (
-              row[3] === true ||
-              row[3] === "TRUE" ||
-              row[3] === "true"
-            );
-
-
-          targetAnswerKey =
-            answerKey;
-
-
-          targetRecord = {
-
-            recordTime:
-              new Date().toISOString(),
-
-            player:
-              String(row[0]).trim(),
-
-            selected:
-              String(row[1]).trim(),
-
-            dog:
-              String(row[2]).trim(),
-
-            correct:
-              correct,
-
-            stage:
-              String(row[4]).trim(),
-
-            gasTimestamp:
-              row[5],
-
-            monitorFetchMs:
-              Math.round(gasFetchTime),
-
-            jsonParseMs:
-              Math.round(jsonTime),
-
-            loadToDetectMs:
-              Math.round(
-                detectTime - loadStart
-              ),
-
-            detectPerformanceMs:
-              Math.round(detectTime)
-
-          };
-
-
-          console.log(
-            "================================"
-          );
-
-          console.log(
-            "【原因追及 START】"
-          );
-
-          console.log(
-            "番号=" +
-            targetRecord.selected
-          );
-
-          console.log(
-            "player=" +
-            targetRecord.player
-          );
-
-          console.log(
-            "correct=" +
-            targetRecord.correct
-          );
-
-          console.log(
-            "stage=" +
-            targetRecord.stage
-          );
-
-          console.log(
-            "GAS回答記録時刻=",
-            targetRecord.gasTimestamp
-          );
-
-          console.log(
-            "モニターGAS取得=" +
-            targetRecord.monitorFetchMs +
-            "ms"
-          );
-
-          console.log(
-            "JSON解析=" +
-            targetRecord.jsonParseMs +
-            "ms"
-          );
-
-          console.log(
-            "今回load開始→回答検知=" +
-            targetRecord.loadToDetectMs +
-            "ms"
-          );
-
-          console.log(
-            "【原因追及】今回の1回答を追跡"
-          );
-
-          console.log(
-            "================================"
-          );
-
-
-          break;
-
-        }
-
-      }
-
-    }
-
-
-    /* =====================================================
-       写真先読み
-       ===================================================== */
+    /* -----------------------------------------
+       現在ステージの写真を事前読み込み
+       ----------------------------------------- */
 
     if (data.questions) {
 
@@ -447,7 +322,8 @@ async function load() {
 
         if (
           stage ===
-          String(currentStage).trim() &&
+          String(currentStage).trim()
+          &&
           img
         ) {
 
@@ -468,10 +344,10 @@ async function load() {
 
     if (currentStage === 0) {
 
-      document.getElementById(
-        "mainTitle"
-      ).innerText =
-        "🎉 イベント結果発表 🎉";
+      document
+        .getElementById("mainTitle")
+        .innerText =
+          "🎉 イベント結果発表 🎉";
 
 
       if (
@@ -495,11 +371,11 @@ async function load() {
 
         tableRows += `
           <tr>
-            <td style="text-align:left;padding-left:50px;">
+            <td style="text-align: left; padding-left: 50px;">
               ${item.player}
             </td>
 
-            <td style="text-align:right;padding-right:50px;">
+            <td style="text-align: right; padding-right: 50px;">
               <span class="score-num">
                 ${item.total}
               </span> 点
@@ -516,10 +392,19 @@ async function load() {
           <table class="score-table">
 
             <thead>
+
               <tr>
-                <th>ニックネーム</th>
-                <th>合計得点</th>
+
+                <th style="text-align: left; padding-left: 50px;">
+                  ニックネーム
+                </th>
+
+                <th style="text-align: right; padding-right: 50px;">
+                  合計得点
+                </th>
+
               </tr>
+
             </thead>
 
             <tbody>
@@ -532,18 +417,23 @@ async function load() {
       `;
 
       return;
-
     }
 
 
     /* =====================================================
-       正解マップ
+       Stage > 0
        ===================================================== */
+
+    let stageTitle =
+      "クイズ";
+
 
     let correctMap = {};
 
-    let stageTitle = "クイズ";
 
+    /* -----------------------------------------
+       正解データマップ
+       ----------------------------------------- */
 
     if (data.answers) {
 
@@ -560,6 +450,10 @@ async function load() {
 
         const stage =
           String(row[4]).trim();
+
+
+        const answerId =
+          String(row[7] || "").trim();
 
 
         const isCorrect =
@@ -582,6 +476,134 @@ async function load() {
               player;
 
           }
+
+
+          /*
+             回答IDを記録。
+
+             row[7] = answerId
+          */
+
+          if (answerId) {
+
+            window.diagnosticAnswers.set(
+              key,
+              {
+                answerId:
+                  answerId,
+
+                player:
+                  player,
+
+                selected:
+                  selected,
+
+                stage:
+                  stage,
+
+                monitorFetchMs:
+                  monitorFetchMs
+              }
+            );
+
+          }
+
+        }
+
+      });
+
+    }
+
+
+    /* =====================================================
+       新しい回答の検知
+       ===================================================== */
+
+    if (data.answers) {
+
+      data.answers.forEach(row => {
+
+        const key =
+          row
+            .map(v => String(v))
+            .join("|");
+
+
+        if (
+          !window.answerKeys.has(key)
+        ) {
+
+          const answerId =
+            String(row[7] || "").trim();
+
+
+          console.log(
+            "【原因追及 START】"
+          );
+
+          console.log(
+            "番号=" + row[1]
+          );
+
+          console.log(
+            "player=" + row[0]
+          );
+
+          console.log(
+            "correct=" + row[3]
+          );
+
+          console.log(
+            "stage=" + row[4]
+          );
+
+          console.log(
+            "answerId=" +
+              answerId
+          );
+
+          console.log(
+            "GAS回答記録時刻=" +
+              row[6]
+          );
+
+          console.log(
+            "モニターGAS取得=" +
+              Math.round(
+                gasFetchTime
+              ) +
+              "ms"
+          );
+
+          console.log(
+            "JSON解析=" +
+              Math.round(
+                jsonTime
+              ) +
+              "ms"
+          );
+
+          console.log(
+            "今回load開始→回答検知=" +
+              Math.round(
+                performance.now() -
+                loadStart
+              ) +
+              "ms"
+          );
+
+          console.log(
+            "【原因追及】今回の1回答を追跡"
+          );
+
+          console.log(
+            "================================"
+          );
+
+
+          window.answerKeys.add(
+            key
+          );
 
         }
 
@@ -661,8 +683,8 @@ async function load() {
               "images/" + img;
 
 
-            cellContent += `
-              <img
+            cellContent +=
+              `<img
                 src="${
                   preloadedImages.get(
                     imageSrc
@@ -670,9 +692,8 @@ async function load() {
                   imageSrc
                 }"
                 data-monitor-image="${imageSrc}"
-                data-monitor-key="${key}"
-              >
-            `;
+                data-answer-key="${key}"
+              >`;
 
           }
 
@@ -709,208 +730,366 @@ async function load() {
       gridHTML;
 
 
-    document.getElementById(
-      "mainTitle"
-    ).innerText =
-      stageTitle;
+    document
+      .getElementById("mainTitle")
+      .innerText =
+        stageTitle;
 
 
     const renderEnd =
       performance.now();
 
 
+    /*
+       TRUE表示時刻
+
+       正解が画面へ反映された直後
+    */
+
+    const trueDisplayMs =
+      Date.now();
+
+
     /* =====================================================
-       今回の回答の写真を追跡
+       新回答のTRUE表示をConsoleへ
        ===================================================== */
 
-    if (
-      targetRecord &&
-      targetRecord.correct &&
-      !targetPhotoDone
-    ) {
+    if (data.answers) {
 
-      const targetKey =
-        targetRecord.stage +
-        "-" +
-        targetRecord.selected;
+      data.answers.forEach(row => {
 
+        const correct =
+          row[3];
 
-      const targetImage =
-        displayArea.querySelector(
-          `img[data-monitor-key="${targetKey}"]`
-        );
+        const stage =
+          String(row[4]).trim();
 
+        const selected =
+          String(row[1]).trim();
 
-      if (targetImage) {
-
-        const photoStart =
-          performance.now();
-
-
-        const finishPhoto =
-          () => {
-
-            if (targetPhotoDone) {
-              return;
-            }
-
-
-            targetPhotoDone =
-              true;
-
-
-            const photoEnd =
-              performance.now();
-
-
-            const detectToPhoto =
-              photoEnd -
-              targetRecord.detectPerformanceMs;
-
-
-            const photoWait =
-              photoEnd -
-              photoStart;
-
-
-            const record = {
-
-              ...targetRecord,
-
-              htmlBuildMs:
-                Math.round(
-                  htmlBuildEnd -
-                  htmlBuildStart
-                ),
-
-              renderMs:
-                Math.round(
-                  renderEnd -
-                  renderStart
-                ),
-
-              detectToPhotoMs:
-                Math.round(
-                  detectToPhoto
-                ),
-
-              photoWaitMs:
-                Math.round(
-                  photoWait
-                ),
-
-              completedAt:
-                new Date().toISOString()
-
-            };
-
-
-            saveDiagnostic(record);
-
-
-            console.log(
-              "================================"
-            );
-
-            console.log(
-              "【原因追及 PHOTO】"
-            );
-
-            console.log(
-              "番号=" +
-              record.selected
-            );
-
-            console.log(
-              "モニターGAS取得=" +
-              record.monitorFetchMs +
-              "ms"
-            );
-
-            console.log(
-              "JSON解析=" +
-              record.jsonParseMs +
-              "ms"
-            );
-
-            console.log(
-              "回答検知→写真=" +
-              record.detectToPhotoMs +
-              "ms"
-            );
-
-            console.log(
-              "写真待ち=" +
-              record.photoWaitMs +
-              "ms"
-            );
-
-            console.log(
-              "HTML構築=" +
-              record.htmlBuildMs +
-              "ms"
-            );
-
-            console.log(
-              "画面反映=" +
-              record.renderMs +
-              "ms"
-            );
-
-            console.log(
-              "【原因追及 END】"
-            );
-
-            console.log(
-              "自動保存済み"
-            );
-
-            console.log(
-              "================================"
-            );
-
-          };
-
-
-        if (
-          targetImage.complete
-        ) {
-
-          finishPhoto();
-
-        } else {
-
-          targetImage.addEventListener(
-            "load",
-            finishPhoto,
-            { once: true }
+        const isCorrect =
+          (
+            correct === true ||
+            correct === "TRUE" ||
+            correct === "true"
           );
 
 
-          targetImage.addEventListener(
-            "error",
-            () => {
+        if (!isCorrect) {
+          return;
+        }
 
-              console.error(
-                "【今回回答 PHOTOエラー】",
-                targetImage.src
-              );
 
-            },
-            { once: true }
+        const key =
+          stage + "-" + selected;
+
+
+        const diagnostic =
+          window.diagnosticAnswers.get(
+            key
+          );
+
+
+        if (
+          diagnostic &&
+          !diagnostic.trueLogged
+        ) {
+
+          diagnostic.trueLogged =
+            true;
+
+          diagnostic.trueDisplayMs =
+            trueDisplayMs;
+
+
+          console.log(
+            "【原因追及 TRUE】"
+          );
+
+          console.log(
+            "番号=" + selected
+          );
+
+          console.log(
+            "answerId=" +
+              diagnostic.answerId
+          );
+
+          console.log(
+            "TRUE表示時刻=" +
+              trueDisplayMs
+          );
+
+          console.log(
+            "モニターGAS取得=" +
+              diagnostic.monitorFetchMs
           );
 
         }
 
-      }
+      });
 
     }
+
+
+    /* =====================================================
+       画像読み込み時間
+       ===================================================== */
+
+    const imageElements =
+      displayArea.querySelectorAll(
+        "img[data-monitor-image]"
+      );
+
+
+    imageElements.forEach(img => {
+
+      const imageSrc =
+        img.getAttribute(
+          "data-monitor-image"
+        );
+
+
+      const answerKey =
+        img.getAttribute(
+          "data-answer-key"
+        );
+
+
+      const imageStart =
+        performance.now();
+
+
+      const reportImageLoad =
+        () => {
+
+          const imageEnd =
+            performance.now();
+
+
+          const imageLoadTime =
+            imageEnd - imageStart;
+
+
+          const totalTime =
+            imageEnd - loadStart;
+
+
+          const photoDisplayMs =
+            Date.now();
+
+
+          console.log(
+            "==============================="
+          );
+
+
+          console.log(
+            "【原因追及 PHOTO】"
+          );
+
+
+          console.log(
+            "番号=" +
+              answerKey.split("-")[1]
+          );
+
+
+          const diagnostic =
+            window.diagnosticAnswers.get(
+              answerKey
+            );
+
+
+          if (diagnostic) {
+
+            console.log(
+              "answerId=" +
+                diagnostic.answerId
+            );
+
+            console.log(
+              "モニターGAS取得=" +
+                Math.round(
+                  diagnostic.monitorFetchMs
+                ) +
+                "ms"
+            );
+
+
+            if (
+              diagnostic.trueDisplayMs
+            ) {
+
+              console.log(
+                "回答検知→写真=" +
+                  Math.round(
+                    photoDisplayMs -
+                    diagnostic.trueDisplayMs
+                  ) +
+                  "ms"
+              );
+
+            }
+
+
+            console.log(
+              "写真待ち=" +
+                Math.round(
+                  imageLoadTime
+                ) +
+                "ms"
+            );
+
+          }
+
+
+          console.log(
+            "HTML構築=" +
+              Math.round(
+                htmlBuildEnd -
+                htmlBuildStart
+              ) +
+              "ms"
+          );
+
+
+          console.log(
+            "画面反映=" +
+              Math.round(
+                renderEnd -
+                renderStart
+              ) +
+              "ms"
+          );
+
+
+          console.log(
+            "【原因追及 END】"
+          );
+
+
+          /*
+             timing_logへ送信
+
+             ① Monitor取得
+             ② TRUE表示
+             ③ 写真表示
+          */
+
+          if (diagnostic) {
+
+            sendMonitorTiming(
+
+              diagnostic.answerId,
+
+              diagnostic.monitorFetchMs,
+
+              diagnostic.trueDisplayMs ||
+                trueDisplayMs,
+
+              photoDisplayMs
+
+            );
+
+          }
+
+
+          /*
+             従来の異常PHOTO計測も残す
+          */
+
+          if (
+            imageLoadTime >= 5000 ||
+            totalTime >= 5000
+          ) {
+
+            console.warn(
+              "【異常PHOTO計測】",
+              imageSrc,
+              "HTML構築=" +
+                Math.round(
+                  htmlBuildEnd -
+                  htmlBuildStart
+                ) +
+                "ms",
+              "画面反映=" +
+                Math.round(
+                  renderEnd -
+                  renderStart
+                ) +
+                "ms",
+              "画像読み込み=" +
+                Math.round(
+                  imageLoadTime
+                ) +
+                "ms",
+              "load開始から=" +
+                Math.round(
+                  totalTime
+                ) +
+                "ms"
+            );
+
+          }
+
+        };
+
+
+      if (img.complete) {
+
+        reportImageLoad();
+
+      } else {
+
+        img.addEventListener(
+          "load",
+          reportImageLoad,
+          { once: true }
+        );
+
+
+        img.addEventListener(
+          "error",
+          () => {
+
+            console.error(
+              "【PHOTOエラー】",
+              imageSrc
+            );
+
+          },
+          { once: true }
+        );
+
+      }
+
+    });
+
+
+    /* =====================================================
+       LOAD全体
+       ===================================================== */
+
+    const loadEnd =
+      performance.now();
+
+
+    console.log(
+      "【LOAD全体】",
+      "load開始→画面反映=" +
+        Math.round(
+          loadEnd -
+          loadStart
+        ) +
+        "ms"
+    );
 
 
   } catch (error) {
 
     console.error(
-      "【MONITORエラー】",
+      "データ取得エラー:",
       error
     );
 
@@ -920,12 +1099,14 @@ async function load() {
 
 
 /* =========================================================
-   1秒ごとに更新
+   モニター更新
+   1秒ごと
    ========================================================= */
 
 async function monitorLoop() {
 
   await load();
+
 
   setTimeout(
     monitorLoop,

@@ -48,20 +48,12 @@ const debugDiv =
 document.getElementById("debug");
 
 
-/* =========================================================
-   プレイヤー情報
-   ========================================================= */
-
 const player =
 localStorage.getItem("player");
 
 const selected =
 localStorage.getItem("selectedNumber");
 
-
-/* =========================================================
-   NFCタグ情報
-   ========================================================= */
 
 const params =
 new URLSearchParams(location.search);
@@ -79,10 +71,6 @@ const sendNumber =
 number || dog;
 
 
-/* =========================================================
-   二重送信防止
-   ========================================================= */
-
 const sendKey =
 "sending_" +
 String(player || "") + "_" +
@@ -91,73 +79,49 @@ String(sendNumber || "") + "_" +
 String(tagStage || "");
 
 
-/* =========================================================
-   自動保存
-   ========================================================= */
-
 function saveSendRecord(record) {
 
-  const key =
-    "NFC_SEND_HISTORY";
+  const key = "NFC_SEND_HISTORY";
 
   let history = [];
 
   try {
-
     history =
       JSON.parse(
         localStorage.getItem(key) || "[]"
       );
-
   } catch (e) {
-
     history = [];
-
   }
-
 
   history.push(record);
 
-
   if (history.length > 100) {
-
-    history =
-      history.slice(-100);
-
+    history = history.slice(-100);
   }
-
 
   localStorage.setItem(
     key,
     JSON.stringify(history)
   );
-
 }
 
-
-/* =========================================================
-   送信
-   ========================================================= */
 
 function send() {
 
   const measureStart =
     performance.now();
 
-  const sendStartDate =
-    new Date();
+  const sendStartMs =
+    Date.now();
 
-  const sendStartISO =
-    sendStartDate.toISOString();
+  const startTime =
+    new Date(sendStartMs).toISOString();
 
 
   msgDiv.innerText =
     "📡 送信中…";
 
-
-  /* -----------------------------------------
-     二重送信防止
-     ----------------------------------------- */
 
   if (
     sessionStorage.getItem(sendKey)
@@ -168,7 +132,6 @@ function send() {
       "二重送信防止";
 
     return;
-
   }
 
 
@@ -178,30 +141,17 @@ function send() {
   );
 
 
-  /* -----------------------------------------
-     GAS URL
-     ----------------------------------------- */
+  const fetchStart =
+    performance.now();
+
 
   const url =
     `${GAS_URL}?player=${encodeURIComponent(player)}` +
     `&selected=${encodeURIComponent(selected)}` +
     `&number=${encodeURIComponent(sendNumber)}` +
     `&tagStage=${encodeURIComponent(tagStage)}` +
+    `&clientSendMs=${encodeURIComponent(sendStartMs)}` +
     `&_=${Date.now()}`;
-
-
-  /* -----------------------------------------
-     fetch開始
-     ----------------------------------------- */
-
-  const fetchStart =
-    performance.now();
-
-  const fetchStartDate =
-    new Date();
-
-  const fetchStartISO =
-    fetchStartDate.toISOString();
 
 
   fetch(url, {
@@ -211,37 +161,23 @@ function send() {
 
   .then(response => {
 
-    const responseDate =
-      new Date();
+    return response.json();
 
-    const responseISO =
-      responseDate.toISOString();
+  })
 
+  .then(data => {
 
     const gasResponseTime =
       performance.now() -
       measureStart;
-
 
     const fetchTime =
       performance.now() -
       fetchStart;
 
 
-    /* -----------------------------------------
-       送信しました表示
-       ----------------------------------------- */
-
-    const displayDate =
-      new Date();
-
-    const displayISO =
-      displayDate.toISOString();
-
-
-    const sendDisplayTime =
-      performance.now() -
-      measureStart;
+    const answerId =
+      String(data.answerId || "").trim();
 
 
     sessionStorage.setItem(
@@ -250,13 +186,17 @@ function send() {
     );
 
 
+    const sentDisplayMs =
+      Date.now();
+
+    const sendDisplayTime =
+      performance.now() -
+      measureStart;
+
+
     msgDiv.innerText =
       "📩 送信しました！";
 
-
-    /* -----------------------------------------
-       画面表示
-       ----------------------------------------- */
 
     debugDiv.innerText =
       "fetch開始 → GAS応答：約 " +
@@ -272,23 +212,19 @@ function send() {
       " ms";
 
 
-    /* -----------------------------------------
-       自動保存
-       ----------------------------------------- */
-
     saveSendRecord({
 
       time:
-        sendStartISO,
+        startTime,
 
-      fetchStartTime:
-        fetchStartISO,
+      sendStartMs:
+        sendStartMs,
 
-      gasResponseTimeISO:
-        responseISO,
+      sentDisplayMs:
+        sentDisplayMs,
 
-      displayTimeISO:
-        displayISO,
+      answerId:
+        answerId,
 
       player:
         player,
@@ -320,9 +256,25 @@ function send() {
     });
 
 
-    /* -----------------------------------------
-       1.5秒後に戻る
-       ----------------------------------------- */
+    /* 「送信しました」表示時刻をGASへ保存 */
+
+    if (answerId) {
+
+      const displayUrl =
+        `${GAS_URL}?event=sentDisplay` +
+        `&answerId=${encodeURIComponent(answerId)}` +
+        `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}` +
+        `&_=${Date.now()}`;
+
+
+      fetch(displayUrl, {
+        method: "GET",
+        cache: "no-store"
+      })
+      .catch(() => {});
+
+    }
+
 
     setTimeout(() => {
 
@@ -336,13 +288,6 @@ function send() {
 
   .catch(error => {
 
-    const errorDate =
-      new Date();
-
-    const errorISO =
-      errorDate.toISOString();
-
-
     const errorTime =
       performance.now() -
       measureStart;
@@ -352,6 +297,10 @@ function send() {
       sendKey,
       "sent"
     );
+
+
+    const errorMs =
+      Date.now();
 
 
     msgDiv.innerText =
@@ -365,20 +314,16 @@ function send() {
       " ms";
 
 
-    /* -----------------------------------------
-       エラーも自動保存
-       ----------------------------------------- */
-
     saveSendRecord({
 
       time:
-        sendStartISO,
+        startTime,
 
-      fetchStartTime:
-        fetchStartISO,
+      sendStartMs:
+        sendStartMs,
 
-      errorTimeISO:
-        errorISO,
+      errorTimeMs:
+        errorMs,
 
       player:
         player,
@@ -407,10 +352,6 @@ function send() {
     });
 
 
-    /* -----------------------------------------
-       1.5秒後に戻る
-       ----------------------------------------- */
-
     setTimeout(() => {
 
       location.href =
@@ -422,10 +363,6 @@ function send() {
 
 }
 
-
-/* =========================================================
-   実行
-   ========================================================= */
 
 send();
 

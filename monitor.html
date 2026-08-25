@@ -174,7 +174,7 @@ function sendMonitorTiming(
     return;
   }
 
-  window.monitorTimingSent.add(answerId);
+ 
 
 
   const url =
@@ -197,7 +197,7 @@ function sendMonitorTiming(
     cache: "no-store"
   })
   .then(() => {
-
+ window.monitorTimingSent.add(answerId);
     console.log(
       "【原因追及 timing_log送信完了】",
       "answerId=" + answerId

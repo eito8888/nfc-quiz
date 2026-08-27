@@ -1,13 +1,127 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>送信中...</title>
+
+<style>
+body {
+  font-family: sans-serif;
+  text-align: center;
+  padding-top: 60px;
+}
+
+h1 {
+  font-size: 52px;
+}
+
+#msg {
+  font-size: 50px;
+  font-weight: bold;
+  margin-top: 40px;
+}
+
+#debug {
+  margin-top: 40px;
+  font-size: 28px;
+  line-height: 1.8;
+  font-weight: bold;
+  white-space: pre-line;
+}
+</style>
+</head>
+
+<body>
+
+<h1 id="msg">📡 送信中…</h1>
+<div id="debug"></div>
+
+<script>
+
+const GAS_URL =
+"https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
+
+const msgDiv =
+document.getElementById("msg");
+
+const debugDiv =
+document.getElementById("debug");
+
+
+const player =
+localStorage.getItem("player");
+
+const selected =
+localStorage.getItem("selectedNumber");
+
+
+const params =
+new URLSearchParams(location.search);
+
+const dog =
+params.get("dog");
+
+const number =
+params.get("number");
+
+const tagStage =
+params.get("stage");
+
+const sendNumber =
+number || dog;
+
+
+const sendKey =
+"sending_" +
+String(player || "") + "_" +
+String(selected || "") + "_" +
+String(sendNumber || "") + "_" +
+String(tagStage || "");
+
+
+function saveSendRecord(record) {
+
+  const key = "NFC_SEND_HISTORY";
+
+  let history = [];
+
+  try {
+    history =
+      JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
+  } catch (e) {
+    history = [];
+  }
+
+  history.push(record);
+
+  if (history.length > 100) {
+    history = history.slice(-100);
+  }
+
+  localStorage.setItem(
+    key,
+    JSON.stringify(history)
+  );
+}
+
+
 function send() {
 
   const measureStart =
     performance.now();
 
+  const sendStartMs =
+    Date.now();
+
   const startTime =
-    new Date().toISOString();
+    new Date(sendStartMs).toISOString();
+
 
   msgDiv.innerText =
     "📡 送信中…";
+
 
   if (
     sessionStorage.getItem(sendKey)
@@ -20,14 +134,15 @@ function send() {
     return;
   }
 
+
   sessionStorage.setItem(
     sendKey,
     "sending"
   );
 
 
-  const clientSendMs =
-    Date.now();
+  const fetchStart =
+    performance.now();
 
 
   const url =
@@ -35,12 +150,8 @@ function send() {
     `&selected=${encodeURIComponent(selected)}` +
     `&number=${encodeURIComponent(sendNumber)}` +
     `&tagStage=${encodeURIComponent(tagStage)}` +
-    `&clientSendMs=${encodeURIComponent(clientSendMs)}` +
+    `&clientSendMs=${encodeURIComponent(sendStartMs)}` +
     `&_=${Date.now()}`;
-
-
-  const fetchStart =
-    performance.now();
 
 
   fetch(url, {
@@ -49,6 +160,12 @@ function send() {
   })
 
   .then(response => {
+
+    return response.json();
+
+  })
+
+  .then(data => {
 
     const gasResponseTime =
       performance.now() -
@@ -59,121 +176,112 @@ function send() {
       fetchStart;
 
 
-    return response
-      .json()
-      .then(data => {
-
-        const sendDisplayMs =
-          Date.now();
+    const answerId =
+      String(data.answerId || "").trim();
 
 
-        sessionStorage.setItem(
-          sendKey,
-          "sent"
-        );
+    sessionStorage.setItem(
+      sendKey,
+      "sent"
+    );
 
 
-        msgDiv.innerText =
-          "📩 送信しました！";
+    const sentDisplayMs =
+      Date.now();
+
+    const sendDisplayTime =
+      performance.now() -
+      measureStart;
 
 
-        debugDiv.innerText =
-          "fetch開始 → GAS応答：約 " +
-          Math.round(fetchTime) +
-          " ms\n\n" +
-
-          "送信開始 → GAS応答：約 " +
-          Math.round(gasResponseTime) +
-          " ms\n\n" +
-
-          "送信開始 →「送信しました」表示：約 " +
-          Math.round(
-            performance.now() -
-            measureStart
-          ) +
-          " ms";
+    msgDiv.innerText =
+      "📩 送信しました！";
 
 
-        /*
-         * 「送信しました」表示時刻を
-         * GASへ保存
-         */
-        if (data.answerId) {
+    debugDiv.innerText =
+      "fetch開始 → GAS応答：約 " +
+      Math.round(fetchTime) +
+      " ms\n\n" +
 
-          fetch(
-            GAS_URL +
-            "?event=sentDisplay" +
-            "&answerId=" +
-            encodeURIComponent(
-              data.answerId
-            ) +
-            "&sentDisplayMs=" +
-            encodeURIComponent(
-              sendDisplayMs
-            ) +
-            "&_=" +
-            Date.now(),
-            {
-              method: "GET",
-              cache: "no-store"
-            }
-          );
+      "送信開始 → GAS応答：約 " +
+      Math.round(gasResponseTime) +
+      " ms\n\n" +
 
-        }
+      "送信開始 →「送信しました」表示：約 " +
+      Math.round(sendDisplayTime) +
+      " ms";
 
 
-        saveSendRecord({
+    saveSendRecord({
 
-          time:
-            startTime,
+      time:
+        startTime,
 
-          player:
-            player,
+      sendStartMs:
+        sendStartMs,
 
-          selected:
-            selected,
+      sentDisplayMs:
+        sentDisplayMs,
 
-          dog:
-            dog,
+      answerId:
+        answerId,
 
-          number:
-            sendNumber,
+      player:
+        player,
 
-          tagStage:
-            tagStage,
+      selected:
+        selected,
 
-          fetchStart:
-            Math.round(fetchStart),
+      dog:
+        dog,
 
-          fetchToGas:
-            Math.round(fetchTime),
+      number:
+        sendNumber,
 
-          sendToGas:
-            Math.round(gasResponseTime),
+      tagStage:
+        tagStage,
 
-          sendToDisplay:
-            Math.round(
-              performance.now() -
-              measureStart
-            ),
+      fetchToGas:
+        Math.round(fetchTime),
 
-          result:
-            "GAS_RESPONSE",
+      sendToGas:
+        Math.round(gasResponseTime),
 
-          answerId:
-            data.answerId || ""
+      sendToDisplay:
+        Math.round(sendDisplayTime),
 
-        });
+      result:
+        "GAS_RESPONSE"
+
+    });
 
 
-        setTimeout(() => {
+    /* 「送信しました」表示時刻をGASへ保存 */
 
-          location.href =
-            "player.html";
+    if (answerId) {
 
-        }, 1500);
+      const displayUrl =
+        `${GAS_URL}?event=sentDisplay` +
+        `&answerId=${encodeURIComponent(answerId)}` +
+        `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}` +
+        `&_=${Date.now()}`;
 
-      });
+
+      fetch(displayUrl, {
+        method: "GET",
+        cache: "no-store"
+      })
+      .catch(() => {});
+
+    }
+
+
+    setTimeout(() => {
+
+      location.href =
+        "player.html";
+
+    }, 1500);
 
   })
 
@@ -191,6 +299,10 @@ function send() {
     );
 
 
+    const errorMs =
+      Date.now();
+
+
     msgDiv.innerText =
       "📩 送信しました！";
 
@@ -206,6 +318,12 @@ function send() {
 
       time:
         startTime,
+
+      sendStartMs:
+        sendStartMs,
+
+      errorTimeMs:
+        errorMs,
 
       player:
         player,
@@ -225,6 +343,9 @@ function send() {
       sendToError:
         Math.round(errorTime),
 
+      errorMessage:
+        String(error),
+
       result:
         "ERROR"
 
@@ -241,3 +362,11 @@ function send() {
   });
 
 }
+
+
+send();
+
+</script>
+
+</body>
+</html>

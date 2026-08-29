@@ -34,15 +34,19 @@ h1 {
 <body>
 
 <h1 id="msg">📡 送信中…</h1>
+
 <div id="debug"></div>
+
 
 <script>
 
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
+
 const msgDiv =
 document.getElementById("msg");
+
 
 const debugDiv =
 document.getElementById("debug");
@@ -51,21 +55,28 @@ document.getElementById("debug");
 const player =
 localStorage.getItem("player");
 
+
 const selected =
 localStorage.getItem("selectedNumber");
 
 
 const params =
-new URLSearchParams(location.search);
+new URLSearchParams(
+  location.search
+);
+
 
 const dog =
 params.get("dog");
 
+
 const number =
 params.get("number");
 
+
 const tagStage =
 params.get("stage");
+
 
 const sendNumber =
 number || dog;
@@ -73,37 +84,55 @@ number || dog;
 
 const sendKey =
 "sending_" +
-String(player || "") + "_" +
-String(selected || "") + "_" +
-String(sendNumber || "") + "_" +
+String(player || "") +
+"_" +
+String(selected || "") +
+"_" +
+String(sendNumber || "") +
+"_" +
 String(tagStage || "");
 
 
 function saveSendRecord(record) {
 
-  const key = "NFC_SEND_HISTORY";
+  const key =
+    "NFC_SEND_HISTORY";
+
 
   let history = [];
 
+
   try {
+
     history =
       JSON.parse(
-        localStorage.getItem(key) || "[]"
+        localStorage.getItem(key) ||
+        "[]"
       );
+
   } catch (e) {
+
     history = [];
+
   }
+
 
   history.push(record);
 
+
   if (history.length > 100) {
-    history = history.slice(-100);
+
+    history =
+      history.slice(-100);
+
   }
+
 
   localStorage.setItem(
     key,
     JSON.stringify(history)
   );
+
 }
 
 
@@ -112,11 +141,19 @@ function send() {
   const measureStart =
     performance.now();
 
+
+  /*
+     スマホで送信ボタンを押した時刻
+  */
+
   const sendStartMs =
     Date.now();
 
+
   const startTime =
-    new Date(sendStartMs).toISOString();
+    new Date(
+      sendStartMs
+    ).toISOString();
 
 
   msgDiv.innerText =
@@ -124,14 +161,16 @@ function send() {
 
 
   if (
-    sessionStorage.getItem(sendKey)
-    === "sending"
+    sessionStorage.getItem(
+      sendKey
+    ) === "sending"
   ) {
 
     debugDiv.innerText =
       "二重送信防止";
 
     return;
+
   }
 
 
@@ -154,212 +193,245 @@ function send() {
     `&_=${Date.now()}`;
 
 
-  fetch(url, {
-    method: "GET",
-    cache: "no-store"
-  })
+  fetch(
+    url,
+    {
+      method: "GET",
+      cache: "no-store"
+    }
+  )
 
-  .then(response => {
+  .then(
+    response => response.json()
+  )
 
-    return response.json();
+  .then(
+    data => {
 
-  })
-
-  .then(data => {
-
-    const gasResponseTime =
-      performance.now() -
-      measureStart;
-
-    const fetchTime =
-      performance.now() -
-      fetchStart;
+      const gasResponseTime =
+        performance.now() -
+        measureStart;
 
 
-    const answerId =
-      String(data.answerId || "").trim();
+      const fetchTime =
+        performance.now() -
+        fetchStart;
 
 
-    sessionStorage.setItem(
-      sendKey,
-      "sent"
-    );
+      /*
+         この回答だけのanswerId
+      */
+
+      const answerId =
+        String(
+          data.answerId || ""
+        ).trim();
 
 
-    const sentDisplayMs =
-      Date.now();
-
-    const sendDisplayTime =
-      performance.now() -
-      measureStart;
+      sessionStorage.setItem(
+        sendKey,
+        "sent"
+      );
 
 
-    msgDiv.innerText =
-      "📩 送信しました！";
+      /*
+         実際に
+         「送信しました！」
+         を表示する直前の時刻
+      */
+
+      const sentDisplayMs =
+        Date.now();
 
 
-    debugDiv.innerText =
-      "fetch開始 → GAS応答：約 " +
-      Math.round(fetchTime) +
-      " ms\n\n" +
-
-      "送信開始 → GAS応答：約 " +
-      Math.round(gasResponseTime) +
-      " ms\n\n" +
-
-      "送信開始 →「送信しました」表示：約 " +
-      Math.round(sendDisplayTime) +
-      " ms";
+      const sendDisplayTime =
+        performance.now() -
+        measureStart;
 
 
-    saveSendRecord({
-
-      time:
-        startTime,
-
-      sendStartMs:
-        sendStartMs,
-
-      sentDisplayMs:
-        sentDisplayMs,
-
-      answerId:
-        answerId,
-
-      player:
-        player,
-
-      selected:
-        selected,
-
-      dog:
-        dog,
-
-      number:
-        sendNumber,
-
-      tagStage:
-        tagStage,
-
-      fetchToGas:
-        Math.round(fetchTime),
-
-      sendToGas:
-        Math.round(gasResponseTime),
-
-      sendToDisplay:
-        Math.round(sendDisplayTime),
-
-      result:
-        "GAS_RESPONSE"
-
-    });
+      msgDiv.innerText =
+        "📩 送信しました！";
 
 
-    /* 「送信しました」表示時刻をGASへ保存 */
+      debugDiv.innerText =
+        "fetch開始 → GAS応答：約 " +
+        Math.round(fetchTime) +
+        " ms\n\n" +
 
-    if (answerId) {
+        "送信開始 → GAS応答：約 " +
+        Math.round(gasResponseTime) +
+        " ms\n\n" +
 
-      const displayUrl =
-        `${GAS_URL}?event=sentDisplay` +
-        `&answerId=${encodeURIComponent(answerId)}` +
-        `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}` +
-        `&_=${Date.now()}`;
+        "送信開始 →「送信しました」表示：約 " +
+        Math.round(sendDisplayTime) +
+        " ms";
 
 
-      fetch(displayUrl, {
-        method: "GET",
-        cache: "no-store"
-      })
-      .catch(() => {});
+      saveSendRecord({
+
+        time:
+          startTime,
+
+        sendStartMs:
+          sendStartMs,
+
+        sentDisplayMs:
+          sentDisplayMs,
+
+        answerId:
+          answerId,
+
+        player:
+          player,
+
+        selected:
+          selected,
+
+        dog:
+          dog,
+
+        number:
+          sendNumber,
+
+        tagStage:
+          tagStage,
+
+        fetchToGas:
+          Math.round(fetchTime),
+
+        sendToGas:
+          Math.round(gasResponseTime),
+
+        sendToDisplay:
+          Math.round(sendDisplayTime),
+
+        result:
+          "GAS_RESPONSE"
+
+      });
+
+
+      /*
+         「送信しました」表示時刻を
+         同じanswerIdでGASへ保存
+      */
+
+      if (answerId) {
+
+        const displayUrl =
+          `${GAS_URL}?event=sentDisplay` +
+          `&answerId=${encodeURIComponent(answerId)}` +
+          `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}` +
+          `&_=${Date.now()}`;
+
+
+        fetch(
+          displayUrl,
+          {
+            method: "GET",
+            cache: "no-store"
+          }
+        )
+        .catch(
+          () => {}
+        );
+
+      }
+
+
+      setTimeout(
+        () => {
+
+          location.href =
+            "player.html";
+
+        },
+        1500
+      );
 
     }
+  )
 
 
-    setTimeout(() => {
+  .catch(
+    error => {
 
-      location.href =
-        "player.html";
-
-    }, 1500);
-
-  })
+      const errorTime =
+        performance.now() -
+        measureStart;
 
 
-  .catch(error => {
-
-    const errorTime =
-      performance.now() -
-      measureStart;
-
-
-    sessionStorage.setItem(
-      sendKey,
-      "sent"
-    );
+      sessionStorage.setItem(
+        sendKey,
+        "sent"
+      );
 
 
-    const errorMs =
-      Date.now();
+      const errorMs =
+        Date.now();
 
 
-    msgDiv.innerText =
-      "📩 送信しました！";
+      msgDiv.innerText =
+        "📩 送信しました！";
 
 
-    debugDiv.innerText =
-      "通信ERROR\n\n" +
-      "送信開始 → ERROR：約 " +
-      Math.round(errorTime) +
-      " ms";
+      debugDiv.innerText =
+        "通信ERROR\n\n" +
+        "送信開始 → ERROR：約 " +
+        Math.round(errorTime) +
+        " ms";
 
 
-    saveSendRecord({
+      saveSendRecord({
 
-      time:
-        startTime,
+        time:
+          startTime,
 
-      sendStartMs:
-        sendStartMs,
+        sendStartMs:
+          sendStartMs,
 
-      errorTimeMs:
-        errorMs,
+        errorTimeMs:
+          errorMs,
 
-      player:
-        player,
+        player:
+          player,
 
-      selected:
-        selected,
+        selected:
+          selected,
 
-      dog:
-        dog,
+        dog:
+          dog,
 
-      number:
-        sendNumber,
+        number:
+          sendNumber,
 
-      tagStage:
-        tagStage,
+        tagStage:
+          tagStage,
 
-      sendToError:
-        Math.round(errorTime),
+        sendToError:
+          Math.round(errorTime),
 
-      errorMessage:
-        String(error),
+        errorMessage:
+          String(error),
 
-      result:
-        "ERROR"
+        result:
+          "ERROR"
 
-    });
+      });
 
 
-    setTimeout(() => {
+      setTimeout(
+        () => {
 
-      location.href =
-        "player.html";
+          location.href =
+            "player.html";
 
-    }, 1500);
+        },
+        1500
+      );
 
-  });
+    }
+  );
 
 }
 

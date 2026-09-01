@@ -138,6 +138,19 @@ function saveSendRecord(record) {
 
 function send() {
 
+  console.log(
+    "【SEND開始】",
+    "時刻=" + Date.now(),
+    "player=" + player,
+    "selected=" + selected,
+    "dog=" + dog,
+    "number=" + sendNumber,
+    "tagStage=" + tagStage
+  );
+
+  const measureStart =
+    performance.now();
+
   const measureStart =
     performance.now();
 

@@ -32,6 +32,7 @@ h1 {
 </head>
 
 <body>
+
 <h1 id="msg">📡 送信中…</h1>
 
 <div id="debug"></div>
@@ -144,8 +145,8 @@ function send() {
 
   /*
      ========================================================
-     原因追及
-     SEND開始を必ず記録
+     原因追及①
+     SEND開始
      ========================================================
   */
 
@@ -218,8 +219,8 @@ function send() {
 
   /*
      ========================================================
-     原因追及
-     15秒でタイムアウト
+     原因追及②
+     15秒応答がなければタイムアウト
      ========================================================
   */
 
@@ -232,13 +233,9 @@ function send() {
       () => {
 
         console.error(
-          "【SEND TIMEOUT】15秒経過"
+          "【SEND TIMEOUT】15秒経過",
+          "時刻=" + Date.now()
         );
-
-        debugDiv.innerText =
-          "通信タイムアウト\n\n" +
-          "GASから15秒以内に応答がありません";
-
 
         controller.abort();
 
@@ -256,6 +253,7 @@ function send() {
     }
   )
 
+
   .then(
     response => {
 
@@ -263,6 +261,13 @@ function send() {
         timeoutId
       );
 
+
+      /*
+         ====================================================
+         原因追及③
+         GASからHTTP応答が戻った
+         ====================================================
+      */
 
       console.log(
         "【SEND GAS応答】",
@@ -304,8 +309,12 @@ function send() {
       console.log(
         "【SEND GAS応答完了】",
         "answerId=" + answerId,
-        "fetch=" + Math.round(fetchTime) + "ms",
-        "total=" + Math.round(gasResponseTime) + "ms"
+        "fetch=" +
+          Math.round(fetchTime) +
+          "ms",
+        "total=" +
+          Math.round(gasResponseTime) +
+          "ms"
       );
 
 
@@ -468,16 +477,11 @@ function send() {
         Date.now();
 
 
-      console.error(
-        "【SEND通信ERROR】",
-        "時間=" + Math.round(errorTime) + "ms",
-        "error=" + String(error)
-      );
-
-
       /*
-         AbortErrorなら
-         15秒タイムアウト
+         ====================================================
+         原因追及
+         通信エラー / タイムアウト
+         ====================================================
       */
 
       const isTimeout =
@@ -487,15 +491,30 @@ function send() {
 
       if (isTimeout) {
 
+        console.error(
+          "【SEND TIMEOUT確定】",
+          "15秒",
+          "時刻=" + errorMs
+        );
+
         msgDiv.innerText =
           "📩 送信確認中";
 
 
         debugDiv.innerText =
-          "15秒経過\n\n" +
-          "GASから応答が返りませんでした";
+          "GASから15秒以内に応答がありませんでした";
 
       } else {
+
+        console.error(
+          "【SEND通信ERROR】",
+          "時間=" +
+            Math.round(errorTime) +
+            "ms",
+          "error=" +
+            String(error)
+        );
+
 
         msgDiv.innerText =
           "📩 送信しました！";

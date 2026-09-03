@@ -32,7 +32,6 @@ h1 {
 </head>
 
 <body>
-
 <h1 id="msg">📡 送信中…</h1>
 
 <div id="debug"></div>
@@ -93,6 +92,7 @@ String(sendNumber || "") +
 String(tagStage || "");
 
 
+
 function saveSendRecord(record) {
 
   const key =
@@ -100,7 +100,6 @@ function saveSendRecord(record) {
 
 
   let history = [];
-
 
   try {
 
@@ -135,11 +134,29 @@ function saveSendRecord(record) {
 
 }
 
+
+
 function send() {
 
   const measureStart =
     performance.now();
 
+
+  /*
+     ========================================================
+     原因追及
+     SEND開始を必ず記録
+     ========================================================
+  */
+
+  console.log(
+    "【SEND開始】",
+    "時刻=" + Date.now(),
+    "player=" + player,
+    "selected=" + selected,
+    "number=" + sendNumber,
+    "tagStage=" + tagStage
+  );
 
 
   /*
@@ -169,6 +186,12 @@ function send() {
     debugDiv.innerText =
       "二重送信防止";
 
+
+    console.log(
+      "【SEND二重送信防止】",
+      "sendKey=" + sendKey
+    );
+
     return;
 
   }
@@ -193,20 +216,70 @@ function send() {
     `&_=${Date.now()}`;
 
 
+  /*
+     ========================================================
+     原因追及
+     15秒でタイムアウト
+     ========================================================
+  */
+
+  const controller =
+    new AbortController();
+
+
+  const timeoutId =
+    setTimeout(
+      () => {
+
+        console.error(
+          "【SEND TIMEOUT】15秒経過"
+        );
+
+        debugDiv.innerText =
+          "通信タイムアウト\n\n" +
+          "GASから15秒以内に応答がありません";
+
+
+        controller.abort();
+
+      },
+      15000
+    );
+
+
   fetch(
     url,
     {
       method: "GET",
-      cache: "no-store"
+      cache: "no-store",
+      signal: controller.signal
     }
   )
 
   .then(
-    response => response.json()
+    response => {
+
+      clearTimeout(
+        timeoutId
+      );
+
+
+      console.log(
+        "【SEND GAS応答】",
+        "HTTP=" + response.status,
+        "時刻=" + Date.now()
+      );
+
+
+      return response.json();
+
+    }
   )
+
 
   .then(
     data => {
+
 
       const gasResponseTime =
         performance.now() -
@@ -226,6 +299,14 @@ function send() {
         String(
           data.answerId || ""
         ).trim();
+
+
+      console.log(
+        "【SEND GAS応答完了】",
+        "answerId=" + answerId,
+        "fetch=" + Math.round(fetchTime) + "ms",
+        "total=" + Math.round(gasResponseTime) + "ms"
+      );
 
 
       sessionStorage.setItem(
@@ -312,8 +393,10 @@ function send() {
 
 
       /*
+         ====================================================
          「送信しました」表示時刻を
          同じanswerIdでGASへ保存
+         ====================================================
       */
 
       if (answerId) {
@@ -332,8 +415,16 @@ function send() {
             cache: "no-store"
           }
         )
+
         .catch(
-          () => {}
+          error => {
+
+            console.error(
+              "【SEND sentDisplay送信エラー】",
+              error
+            );
+
+          }
         );
 
       }
@@ -356,6 +447,12 @@ function send() {
   .catch(
     error => {
 
+
+      clearTimeout(
+        timeoutId
+      );
+
+
       const errorTime =
         performance.now() -
         measureStart;
@@ -371,15 +468,46 @@ function send() {
         Date.now();
 
 
-      msgDiv.innerText =
-        "📩 送信しました！";
+      console.error(
+        "【SEND通信ERROR】",
+        "時間=" + Math.round(errorTime) + "ms",
+        "error=" + String(error)
+      );
 
 
-      debugDiv.innerText =
-        "通信ERROR\n\n" +
-        "送信開始 → ERROR：約 " +
-        Math.round(errorTime) +
-        " ms";
+      /*
+         AbortErrorなら
+         15秒タイムアウト
+      */
+
+      const isTimeout =
+        error &&
+        error.name === "AbortError";
+
+
+      if (isTimeout) {
+
+        msgDiv.innerText =
+          "📩 送信確認中";
+
+
+        debugDiv.innerText =
+          "15秒経過\n\n" +
+          "GASから応答が返りませんでした";
+
+      } else {
+
+        msgDiv.innerText =
+          "📩 送信しました！";
+
+
+        debugDiv.innerText =
+          "通信ERROR\n\n" +
+          "送信開始 → ERROR：約 " +
+          Math.round(errorTime) +
+          " ms";
+
+      }
 
 
       saveSendRecord({
@@ -415,7 +543,9 @@ function send() {
           String(error),
 
         result:
-          "ERROR"
+          isTimeout
+            ? "TIMEOUT"
+            : "ERROR"
 
       });
 

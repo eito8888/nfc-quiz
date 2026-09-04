@@ -93,12 +93,15 @@ String(sendNumber || "") +
 String(tagStage || "");
 
 
+/* =========================================================
+   診断履歴
+   ※ サーバーへは送らない
+   ========================================================= */
 
 function saveSendRecord(record) {
 
   const key =
     "NFC_SEND_HISTORY";
-
 
   let history = [];
 
@@ -116,9 +119,7 @@ function saveSendRecord(record) {
 
   }
 
-
   history.push(record);
-
 
   if (history.length > 100) {
 
@@ -127,46 +128,66 @@ function saveSendRecord(record) {
 
   }
 
-
   localStorage.setItem(
     key,
     JSON.stringify(history)
   );
+}
+
+
+/* =========================================================
+   直前診断結果を保存
+   ========================================================= */
+
+function saveLastDiagnostic(record) {
+
+  try {
+
+    localStorage.setItem(
+      "NFC_LAST_DIAGNOSTIC",
+      JSON.stringify(record)
+    );
+
+  } catch (e) {
+
+    console.error(
+      "【診断保存ERROR】",
+      e
+    );
+
+  }
+}
+
+
+/* =========================================================
+   診断結果表示
+   ========================================================= */
+
+function showDiagnostic(lines) {
+
+  debugDiv.innerText =
+    lines.join("\n\n");
 
 }
 
 
+/* =========================================================
+   メイン送信
+   ========================================================= */
 
 function send() {
+
+  /*
+     ========================================================
+     ① SEND開始
+     ========================================================
+  */
 
   const measureStart =
     performance.now();
 
-
-  /*
-     ========================================================
-     原因追及①
-     SEND開始
-     ========================================================
-  */
-
-  console.log(
-    "【SEND開始】",
-    "時刻=" + Date.now(),
-    "player=" + player,
-    "selected=" + selected,
-    "number=" + sendNumber,
-    "tagStage=" + tagStage
-  );
-
-
-  /*
-     スマホで送信ボタンを押した時刻
-  */
-
   const sendStartMs =
     Date.now();
-
 
   const startTime =
     new Date(
@@ -174,9 +195,23 @@ function send() {
     ).toISOString();
 
 
+  console.log(
+    "【SEND開始】",
+    "時刻=" + sendStartMs,
+    "player=" + player,
+    "selected=" + selected,
+    "number=" + sendNumber,
+    "tagStage=" + tagStage
+  );
+
+
   msgDiv.innerText =
     "📡 送信中…";
 
+
+  /*
+     二重送信防止
+  */
 
   if (
     sessionStorage.getItem(
@@ -187,14 +222,12 @@ function send() {
     debugDiv.innerText =
       "二重送信防止";
 
-
     console.log(
       "【SEND二重送信防止】",
       "sendKey=" + sendKey
     );
 
     return;
-
   }
 
 
@@ -204,8 +237,23 @@ function send() {
   );
 
 
+  /*
+     ========================================================
+     ② fetch開始
+     ========================================================
+  */
+
   const fetchStart =
     performance.now();
+
+  const fetchStartMs =
+    Date.now();
+
+
+  console.log(
+    "【SEND fetch開始】",
+    "時刻=" + fetchStartMs
+  );
 
 
   const url =
@@ -219,8 +267,7 @@ function send() {
 
   /*
      ========================================================
-     原因追及②
-     15秒応答がなければタイムアウト
+     ③ 15秒タイムアウト
      ========================================================
   */
 
@@ -232,10 +279,64 @@ function send() {
     setTimeout(
       () => {
 
+        const timeoutNow =
+          Date.now();
+
+        const timeoutElapsed =
+          performance.now() -
+          measureStart;
+
+
         console.error(
-          "【SEND TIMEOUT】15秒経過",
-          "時刻=" + Date.now()
+          "【SEND TIMEOUT】",
+          "時刻=" + timeoutNow,
+          "経過=" +
+            Math.round(timeoutElapsed) +
+            "ms"
         );
+
+
+        /*
+           タイムアウト時点でも
+           診断結果を保存
+        */
+
+        const diagnostic = {
+
+          result:
+            "TIMEOUT",
+
+          sendStartMs:
+            sendStartMs,
+
+          fetchStartMs:
+            fetchStartMs,
+
+          timeoutMs:
+            timeoutNow,
+
+          elapsedMs:
+            Math.round(timeoutElapsed),
+
+          player:
+            player,
+
+          selected:
+            selected,
+
+          number:
+            sendNumber,
+
+          tagStage:
+            tagStage
+
+        };
+
+
+        saveLastDiagnostic(
+          diagnostic
+        );
+
 
         controller.abort();
 
@@ -243,6 +344,12 @@ function send() {
       15000
     );
 
+
+  /*
+     ========================================================
+     ④ GASへfetch
+     ========================================================
+  */
 
   fetch(
     url,
@@ -254,26 +361,58 @@ function send() {
   )
 
 
+  /*
+     ========================================================
+     ⑤ HTTP応答受信
+     ========================================================
+  */
+
   .then(
     response => {
+
+      const responseMs =
+        Date.now();
+
+      const responseElapsed =
+        performance.now() -
+        measureStart;
+
 
       clearTimeout(
         timeoutId
       );
 
 
-      /*
-         ====================================================
-         原因追及③
-         GASからHTTP応答が戻った
-         ====================================================
-      */
-
       console.log(
         "【SEND GAS応答】",
         "HTTP=" + response.status,
-        "時刻=" + Date.now()
+        "時刻=" + responseMs,
+        "経過=" +
+          Math.round(responseElapsed) +
+          "ms"
       );
+
+
+      if (!response.ok) {
+
+        throw new Error(
+          "HTTP " +
+          response.status
+        );
+
+      }
+
+
+      /*
+         response.json() の前に
+         計測値を保存
+      */
+
+      window.__sendResponseMs =
+        responseMs;
+
+      window.__sendResponseElapsed =
+        responseElapsed;
 
 
       return response.json();
@@ -282,23 +421,47 @@ function send() {
   )
 
 
+  /*
+     ========================================================
+     ⑥ JSON解析完了
+     ========================================================
+  */
+
   .then(
     data => {
 
+      const jsonEnd =
+        performance.now();
+
+      const jsonEndMs =
+        Date.now();
+
 
       const gasResponseTime =
-        performance.now() -
+        jsonEnd -
         measureStart;
 
 
       const fetchTime =
-        performance.now() -
+        jsonEnd -
         fetchStart;
 
 
       /*
-         この回答だけのanswerId
+         GASから返された時刻
       */
+
+      const gasReceiveMs =
+        Number(
+          data.gasReceiveMs
+        ) || 0;
+
+
+      const gasCompleteMs =
+        Number(
+          data.gasCompleteMs
+        ) || 0;
+
 
       const answerId =
         String(
@@ -306,28 +469,76 @@ function send() {
         ).trim();
 
 
-      console.log(
-        "【SEND GAS応答完了】",
-        "answerId=" + answerId,
-        "fetch=" +
-          Math.round(fetchTime) +
-          "ms",
-        "total=" +
-          Math.round(gasResponseTime) +
-          "ms"
-      );
+      /*
+         ====================================================
+         GAS内部時間
+         ====================================================
+      */
 
+      let gasInternalMs =
+        0;
 
-      sessionStorage.setItem(
-        sendKey,
-        "sent"
-      );
+      if (
+        gasReceiveMs &&
+        gasCompleteMs
+      ) {
+
+        gasInternalMs =
+          gasCompleteMs -
+          gasReceiveMs;
+
+      }
 
 
       /*
-         実際に
-         「送信しました！」
-         を表示する直前の時刻
+         ====================================================
+         GAS開始→受信
+         W列と同じ意味
+         ====================================================
+      */
+
+      /*
+         GAS開始時刻は
+         gasReceiveMs から
+         W相当の時間を引いて求める
+         
+         現在のGASはWを直接返していないため、
+         answers/timing_logのWとは
+         完全同一値ではなく、
+         今回は画面側で算出可能な
+         GAS内部時間を中心に表示する。
+      */
+
+
+      /*
+         ====================================================
+         GAS外時間
+         
+         fetch全体から
+         GAS内部処理時間を引く
+         
+         ※この値には
+         スマホ→GAS実行開始
+         および
+         GAS応答→スマホ
+         の両方を含む
+         ====================================================
+      */
+
+      const gasOutsideMs =
+        Math.max(
+          0,
+          Math.round(
+            fetchTime -
+            gasInternalMs
+          )
+        );
+
+
+      /*
+         ====================================================
+         「送信しました」表示
+         ====================================================
       */
 
       const sentDisplayMs =
@@ -343,27 +554,97 @@ function send() {
         "📩 送信しました！";
 
 
-      debugDiv.innerText =
-        "fetch開始 → GAS応答：約 " +
-        Math.round(fetchTime) +
-        " ms\n\n" +
+      /*
+         ====================================================
+         スマホ診断画面
+         ====================================================
+      */
 
-        "送信開始 → GAS応答：約 " +
-        Math.round(gasResponseTime) +
-        " ms\n\n" +
+      showDiagnostic([
 
-        "送信開始 →「送信しました」表示：約 " +
-        Math.round(sendDisplayTime) +
-        " ms";
+        "【今回の送信診断】",
+
+        "answerId：" +
+          answerId,
+
+        "fetch開始 → GAS応答：" +
+          Math.round(fetchTime) +
+          " ms",
+
+        "GAS受信 → GAS処理完了：" +
+          Math.round(gasInternalMs) +
+          " ms",
+
+        "GAS外の時間：" +
+          gasOutsideMs +
+          " ms",
+
+        "送信開始 →「送信しました」：" +
+          Math.round(sendDisplayTime) +
+          " ms",
+
+        "HTTP：" +
+          response.status,
+
+        "JSON解析：" +
+          Math.round(
+            jsonEnd -
+            (
+              window.__sendResponseElapsed
+                ? measureStart +
+                  window.__sendResponseElapsed
+                : jsonEnd
+            )
+          ) +
+          " ms"
+
+      ]);
 
 
-      saveSendRecord({
+      console.log(
+        "【SEND診断完了】",
+        "answerId=" + answerId,
+        "fetch=" +
+          Math.round(fetchTime) +
+          "ms",
+        "GAS内部=" +
+          Math.round(gasInternalMs) +
+          "ms",
+        "GAS外=" +
+          gasOutsideMs +
+          "ms",
+        "表示=" +
+          Math.round(sendDisplayTime) +
+          "ms"
+      );
+
+
+      /*
+         ====================================================
+         診断結果を保存
+         ====================================================
+      */
+
+      const diagnostic = {
+
+        result:
+          "GAS_RESPONSE",
 
         time:
           startTime,
 
         sendStartMs:
           sendStartMs,
+
+        fetchStartMs:
+          fetchStartMs,
+
+        responseMs:
+          window.__sendResponseMs ||
+          0,
+
+        jsonEndMs:
+          jsonEndMs,
 
         sentDisplayMs:
           sentDisplayMs,
@@ -386,25 +667,37 @@ function send() {
         tagStage:
           tagStage,
 
-        fetchToGas:
+        fetchMs:
           Math.round(fetchTime),
 
-        sendToGas:
-          Math.round(gasResponseTime),
+        gasInternalMs:
+          Math.round(gasInternalMs),
 
-        sendToDisplay:
+        gasOutsideMs:
+          gasOutsideMs,
+
+        sendToDisplayMs:
           Math.round(sendDisplayTime),
 
-        result:
-          "GAS_RESPONSE"
+        httpStatus:
+          response.status
 
-      });
+      };
+
+
+      saveLastDiagnostic(
+        diagnostic
+      );
+
+
+      saveSendRecord(
+        diagnostic
+      );
 
 
       /*
          ====================================================
-         「送信しました」表示時刻を
-         同じanswerIdでGASへ保存
+         「送信しました」表示時刻をGASへ保存
          ====================================================
       */
 
@@ -425,6 +718,18 @@ function send() {
           }
         )
 
+        .then(
+          () => {
+
+            console.log(
+              "【SEND sentDisplay送信完了】",
+              "answerId=" +
+                answerId
+            );
+
+          }
+        )
+
         .catch(
           error => {
 
@@ -438,6 +743,10 @@ function send() {
 
       }
 
+
+      /*
+         10秒間診断画面を表示
+      */
 
       setTimeout(
         () => {
@@ -453,9 +762,14 @@ function send() {
   )
 
 
+  /*
+     ========================================================
+     ⑦ 通信エラー / タイムアウト
+     ========================================================
+  */
+
   .catch(
     error => {
-
 
       clearTimeout(
         timeoutId
@@ -467,22 +781,15 @@ function send() {
         measureStart;
 
 
+      const errorMs =
+        Date.now();
+
+
       sessionStorage.setItem(
         sendKey,
         "sent"
       );
 
-
-      const errorMs =
-        Date.now();
-
-
-      /*
-         ====================================================
-         原因追及
-         通信エラー / タイムアウト
-         ====================================================
-      */
 
       const isTimeout =
         error &&
@@ -493,16 +800,66 @@ function send() {
 
         console.error(
           "【SEND TIMEOUT確定】",
-          "15秒",
-          "時刻=" + errorMs
+          "経過=" +
+            Math.round(errorTime) +
+            "ms",
+          "時刻=" +
+            errorMs
         );
+
 
         msgDiv.innerText =
           "📩 送信確認中";
 
 
-        debugDiv.innerText =
-          "GASから15秒以内に応答がありませんでした";
+        showDiagnostic([
+
+          "【送信診断】TIMEOUT",
+
+          "送信開始 → タイムアウト：" +
+            Math.round(errorTime) +
+            " ms",
+
+          "15秒以内にGASからHTTP応答なし",
+
+          "answerId：取得できず",
+
+          "GAS到達状況：この時点では不明"
+
+        ]);
+
+
+        saveLastDiagnostic({
+
+          result:
+            "TIMEOUT",
+
+          sendStartMs:
+            sendStartMs,
+
+          fetchStartMs:
+            fetchStartMs,
+
+          errorMs:
+            errorMs,
+
+          elapsedMs:
+            Math.round(errorTime),
+
+          player:
+            player,
+
+          selected:
+            selected,
+
+          number:
+            sendNumber,
+
+          tagStage:
+            tagStage
+
+        });
+
 
       } else {
 
@@ -520,11 +877,55 @@ function send() {
           "📩 送信しました！";
 
 
-        debugDiv.innerText =
-          "通信ERROR\n\n" +
-          "送信開始 → ERROR：約 " +
-          Math.round(errorTime) +
-          " ms";
+        showDiagnostic([
+
+          "【送信診断】通信ERROR",
+
+          "送信開始 → ERROR：" +
+            Math.round(errorTime) +
+            " ms",
+
+          "error：" +
+            String(error),
+
+          "answerId：取得できず"
+
+        ]);
+
+
+        saveLastDiagnostic({
+
+          result:
+            "ERROR",
+
+          sendStartMs:
+            sendStartMs,
+
+          fetchStartMs:
+            fetchStartMs,
+
+          errorMs:
+            errorMs,
+
+          elapsedMs:
+            Math.round(errorTime),
+
+          errorMessage:
+            String(error),
+
+          player:
+            player,
+
+          selected:
+            selected,
+
+          number:
+            sendNumber,
+
+          tagStage:
+            tagStage
+
+        });
 
       }
 
@@ -568,6 +969,10 @@ function send() {
 
       });
 
+
+      /*
+         エラー時も10秒表示
+      */
 
       setTimeout(
         () => {

@@ -524,6 +524,19 @@ function send() {
          の両方を含む
          ====================================================
       */
+      // 送信開始→GAS受信（端末時計/GAS時計差を含む参考値）
+      const sendToGasReceiveMs =
+        gasReceiveMs
+          ? Math.round(gasReceiveMs - sendStartMs)
+          : 0;
+
+      // GAS処理完了→スマホHTTP応答（参考値）
+      const gasCompleteToResponseMs =
+        gasCompleteMs && window.__sendResponseMs
+          ? Math.round(window.__sendResponseMs - gasCompleteMs)
+          : 0;
+
+      
 
       const gasOutsideMs =
         Math.max(
@@ -571,8 +584,16 @@ function send() {
           Math.round(fetchTime) +
           " ms",
 
+                "送信開始 → GAS受信（目安）：" +
+          sendToGasReceiveMs +
+          " ms",
+
         "GAS受信 → GAS処理完了：" +
           Math.round(gasInternalMs) +
+          " ms",
+
+        "GAS処理完了 → HTTP応答（目安）：" +
+          gasCompleteToResponseMs +
           " ms",
 
         "GAS外の時間：" +
@@ -672,6 +693,12 @@ function send() {
 
         gasInternalMs:
           Math.round(gasInternalMs),
+
+        sendToGasReceiveMs:
+          sendToGasReceiveMs,
+
+        gasCompleteToResponseMs:
+          gasCompleteToResponseMs,
 
         gasOutsideMs:
           gasOutsideMs,

@@ -112,11 +112,16 @@ img {
 
 <div id="displayArea"></div>
 
+
 <script>
 
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
+
+/* =========================================================
+   写真先読み
+   ========================================================= */
 
 const preloadedImages =
   new Map();
@@ -131,11 +136,14 @@ function preloadImage(src) {
     return;
   }
 
+
   const img =
     new Image();
 
+
   img.src =
     src;
+
 
   preloadedImages.set(
     src,
@@ -145,6 +153,15 @@ function preloadImage(src) {
 }
 
 
+/* =========================================================
+   原因追及用
+   ========================================================= */
+
+/*
+   ページを開いた時点で
+   すでに存在している回答ID
+*/
+
 if (!window.seenAnswerIds) {
 
   window.seenAnswerIds =
@@ -152,6 +169,12 @@ if (!window.seenAnswerIds) {
 
 }
 
+
+/*
+   現在追跡している回答
+
+   answerId → diagnostic
+*/
 
 if (!window.diagnosticAnswers) {
 
@@ -161,6 +184,10 @@ if (!window.diagnosticAnswers) {
 }
 
 
+/*
+   timing_log送信済みanswerId
+*/
+
 if (!window.monitorTimingSent) {
 
   window.monitorTimingSent =
@@ -168,6 +195,10 @@ if (!window.monitorTimingSent) {
 
 }
 
+
+/*
+   初回load判定
+*/
 
 if (
   typeof window.monitorInitialized ===
@@ -180,15 +211,15 @@ if (
 }
 
 
+/* =========================================================
+   Monitor計測をGASへ保存
+   ========================================================= */
+
 function sendMonitorTiming(
   answerId,
   monitorFetchMs,
   trueDisplayMs,
-  photoDisplayMs,
-  fetchDurationMs,
-  answerDetectMs,
-  trueAfterDetectMs,
-  photoAfterTrueMs
+  photoDisplayMs
 ) {
 
   if (!answerId) {
@@ -216,14 +247,6 @@ function sendMonitorTiming(
     encodeURIComponent(trueDisplayMs) +
     "&photoDisplayMs=" +
     encodeURIComponent(photoDisplayMs) +
-    "&fetchDurationMs=" +
-    encodeURIComponent(fetchDurationMs) +
-    "&answerDetectMs=" +
-    encodeURIComponent(answerDetectMs) +
-    "&trueAfterDetectMs=" +
-    encodeURIComponent(trueAfterDetectMs) +
-    "&photoAfterTrueMs=" +
-    encodeURIComponent(photoAfterTrueMs) +
     "&_=" +
     Date.now();
 
@@ -266,6 +289,10 @@ function sendMonitorTiming(
 }
 
 
+/* =========================================================
+   メイン処理
+   ========================================================= */
+
 async function load() {
 
   const loadStart =
@@ -274,10 +301,14 @@ async function load() {
 
   try {
 
+    /* -----------------------------------------
+       ① GAS通信
+       ----------------------------------------- */
+
     const fetchStart =
       performance.now();
 
-    const fetchStartWall =
+    const fetchStartWallMs =
       Date.now();
 
 
@@ -293,9 +324,13 @@ async function load() {
     const fetchEnd =
       performance.now();
 
-    const fetchEndWall =
+    const fetchEndWallMs =
       Date.now();
 
+
+    /* -----------------------------------------
+       ② JSON解析
+       ----------------------------------------- */
 
     const data =
       await res.json();
@@ -319,6 +354,10 @@ async function load() {
       jsonEnd -
       loadStart;
 
+
+    /*
+       JSONを完全に受け取った瞬間
+    */
 
     const monitorFetchMs =
       Date.now();
@@ -349,6 +388,10 @@ async function load() {
         data.currentStage
       );
 
+
+    /* -----------------------------------------
+       写真先読み
+       ----------------------------------------- */
 
     if (data.questions) {
 
@@ -381,6 +424,10 @@ async function load() {
 
     }
 
+
+    /* =====================================================
+       Stage = 0
+       ===================================================== */
 
     if (
       currentStage === 0
@@ -466,6 +513,10 @@ async function load() {
     }
 
 
+    /* =====================================================
+       Stage > 0
+       ===================================================== */
+
     let stageTitle =
       "クイズ";
 
@@ -474,9 +525,17 @@ async function load() {
       {};
 
 
+    /*
+       今回新しく発見した回答
+    */
+
     const newDiagnostics =
       [];
 
+
+    /* =====================================================
+       回答データ確認
+       ===================================================== */
 
     if (data.answers) {
 
@@ -505,6 +564,11 @@ async function load() {
             ).trim();
 
 
+          /*
+             answersの8列目
+             row[7] = answerId
+          */
+
           const answerId =
             String(
               row[7] || ""
@@ -518,6 +582,10 @@ async function load() {
               correct === "true"
             );
 
+
+          /*
+             画面表示用の正解
+          */
 
           if (isCorrect) {
 
@@ -537,17 +605,26 @@ async function load() {
             }
 
 
+            /*
+               ------------------------------------------------
+               重要
+               ------------------------------------------------
+               answerId単位で管理する。
+
+               ただし初回loadでは、
+               過去回答を計測しない。
+               ------------------------------------------------
+            */
+
             if (
               answerId &&
               !window.seenAnswerIds
                 .has(answerId)
             ) {
 
-              const detectedPerf =
-                performance.now();
-
-              const detectedWall =
-                Date.now();
+              /*
+                 新しい回答として発見
+              */
 
               const diagnostic = {
 
@@ -569,31 +646,22 @@ async function load() {
                 monitorFetchMs:
                   monitorFetchMs,
 
+                monitorFetchStartWallMs:
+                  fetchStartWallMs,
+
+                monitorFetchEndWallMs:
+                  fetchEndWallMs,
+
+                answerDetectedWallMs:
+                  Date.now(),
+
+                gasRecordWallMs:
+                  Date.parse(row[6]),
+
                 trueDisplayMs:
                   0,
 
                 photoDisplayMs:
-                  0,
-
-                detectedPerf:
-                  detectedPerf,
-
-                detectedWall:
-                  detectedWall,
-
-                fetchDurationMs:
-                  Math.round(gasFetchTime),
-
-                answerDetectMs:
-                  Math.round(
-                    detectedPerf -
-                    fetchEnd
-                  ),
-
-                trueAfterDetectMs:
-                  0,
-
-                photoAfterTrueMs:
                   0,
 
                 trueLogged:
@@ -603,18 +671,6 @@ async function load() {
                   false
 
               };
-
-
-              const gasRecordedWall =
-                new Date(row[6]).getTime();
-
-              const gasRecordToDetectMs =
-                Number.isFinite(gasRecordedWall)
-                  ? detectedWall - gasRecordedWall
-                  : null;
-
-              diagnostic.gasRecordToDetectMs =
-                gasRecordToDetectMs;
 
 
               window.diagnosticAnswers
@@ -659,41 +715,65 @@ async function load() {
 
 
               console.log(
-                "Monitor fetch時間=" +
-                Math.round(gasFetchTime) +
-                "ms"
-              );
-
-
-              console.log(
-                "fetch完了→回答検知=" +
+                "Monitor GAS取得=" +
                 Math.round(
-                  diagnostic.answerDetectMs
+                  gasFetchTime
                 ) +
                 "ms"
               );
 
 
+              const answerDetectedWallMs =
+                diagnostic.answerDetectedWallMs;
+
+              const fetchDurationMs =
+                diagnostic.monitorFetchEndWallMs -
+                diagnostic.monitorFetchStartWallMs;
+
+              const fetchEndToDetectMs =
+                answerDetectedWallMs -
+                diagnostic.monitorFetchEndWallMs;
+
+              const gasRecordToDetectMs =
+                Number.isFinite(diagnostic.gasRecordWallMs)
+                  ? answerDetectedWallMs - diagnostic.gasRecordWallMs
+                  : null;
+
               console.log(
                 "今回load開始→回答検知=" +
                 Math.round(
-                  detectedPerf -
+                  performance.now() -
                   loadStart
                 ) +
                 "ms"
               );
 
+              console.log(
+                "Monitor fetch開始→完了=" +
+                Math.round(fetchDurationMs) +
+                "ms"
+              );
 
               console.log(
-                "GAS記録→Monitor検知(時計差を含む参考値)=" +
-                (
-                  gasRecordToDetectMs === null
-                    ? "計算不可"
-                    : Math.round(
-                        gasRecordToDetectMs
-                      ) +
-                      "ms"
-                )
+                "fetch完了→回答検知=" +
+                Math.round(fetchEndToDetectMs) +
+                "ms"
+              );
+
+              console.log(
+                "GAS記録→Monitor回答検知=" +
+                (gasRecordToDetectMs === null
+                  ? "計測不可"
+                  : Math.round(gasRecordToDetectMs) +
+                    "ms（端末時計差の影響あり）")
+              );
+
+              console.log(
+                "【原因追及 区間判定】",
+                "Monitor fetch=" +
+                Math.round(fetchDurationMs) + "ms",
+                "fetch後検知=" +
+                Math.round(fetchEndToDetectMs) + "ms"
               );
 
             }
@@ -703,6 +783,17 @@ async function load() {
         }
       );
 
+
+      /*
+         ------------------------------------------------
+         初回load
+         ------------------------------------------------
+
+         この時点ですでに存在する
+         全answerIdを「既知」にする。
+
+         これが過去回答の誤計測防止。
+      */
 
       if (
         !window.monitorInitialized
@@ -728,6 +819,11 @@ async function load() {
         );
 
 
+        /*
+           初回loadで作った
+           newDiagnosticsは破棄
+        */
+
         newDiagnostics.length =
           0;
 
@@ -748,6 +844,10 @@ async function load() {
 
     }
 
+
+    /* =====================================================
+       HTML構築
+       ===================================================== */
 
     const htmlBuildStart =
       performance.now();
@@ -863,6 +963,10 @@ async function load() {
       performance.now();
 
 
+    /* =====================================================
+       画面反映
+       ===================================================== */
+
     const renderStart =
       performance.now();
 
@@ -881,32 +985,27 @@ async function load() {
       performance.now();
 
 
+    /*
+       このloadで新しく検知した回答の
+       TRUE表示時刻
+
+       画面反映直後。
+    */
+
     const trueDisplayMs =
       Date.now();
 
 
-    const trueDisplayPerf =
-      performance.now();
-
+    /*
+       新回答すべてに
+       TRUE時刻を設定
+    */
 
     newDiagnostics.forEach(
       diagnostic => {
 
         diagnostic.trueDisplayMs =
           trueDisplayMs;
-
-
-        diagnostic.trueDisplayPerf =
-          trueDisplayPerf;
-
-
-        diagnostic.trueAfterDetectMs =
-          diagnostic.detectedPerf
-            ? Math.round(
-                trueDisplayPerf -
-                diagnostic.detectedPerf
-              )
-            : 0;
 
 
         diagnostic.trueLogged =
@@ -941,16 +1040,31 @@ async function load() {
           diagnostic.monitorFetchMs
         );
 
+        console.log(
+          "Monitor fetch時間=" +
+          Math.round(
+            diagnostic.monitorFetchEndWallMs -
+            diagnostic.monitorFetchStartWallMs
+          ) +
+          "ms"
+        );
 
         console.log(
-          "回答検知→TRUE=" +
-          diagnostic.trueAfterDetectMs +
+          "fetch完了→TRUE=" +
+          Math.round(
+            diagnostic.trueDisplayMs -
+            diagnostic.monitorFetchEndWallMs
+          ) +
           "ms"
         );
 
       }
     );
 
+
+    /* =====================================================
+       写真
+       ===================================================== */
 
     const imageElements =
       displayArea.querySelectorAll(
@@ -972,6 +1086,11 @@ async function load() {
             "data-answer-key"
           );
 
+
+        /*
+           今回新しく検知した回答のうち、
+           この番号に該当するものを探す
+        */
 
         let diagnostic =
           null;
@@ -1004,6 +1123,11 @@ async function load() {
 
         const reportImageLoad =
           () => {
+
+            /*
+               新回答ではない写真は
+               timing_logに送らない。
+            */
 
             if (!diagnostic) {
               return;
@@ -1041,25 +1165,8 @@ async function load() {
               Date.now();
 
 
-            const photoDisplayPerf =
-              performance.now();
-
-
             diagnostic.photoDisplayMs =
               photoDisplayMs;
-
-
-            diagnostic.photoDisplayPerf =
-              photoDisplayPerf;
-
-
-            diagnostic.photoAfterTrueMs =
-              diagnostic.trueDisplayPerf
-                ? Math.round(
-                    photoDisplayPerf -
-                    diagnostic.trueDisplayPerf
-                  )
-                : 0;
 
 
             console.log(
@@ -1089,6 +1196,24 @@ async function load() {
               diagnostic.monitorFetchMs
             );
 
+            console.log(
+              "Monitor fetch時間=" +
+              Math.round(
+                diagnostic.monitorFetchEndWallMs -
+                diagnostic.monitorFetchStartWallMs
+              ) +
+              "ms"
+            );
+
+            console.log(
+              "fetch完了→TRUE=" +
+              Math.round(
+                diagnostic.trueDisplayMs -
+                diagnostic.monitorFetchEndWallMs
+              ) +
+              "ms"
+            );
+
 
             console.log(
               "TRUE=" +
@@ -1104,7 +1229,10 @@ async function load() {
 
             console.log(
               "TRUE→写真=" +
-              diagnostic.photoAfterTrueMs +
+              Math.round(
+                photoDisplayMs -
+                diagnostic.trueDisplayMs
+              ) +
               "ms"
             );
 
@@ -1139,29 +1267,14 @@ async function load() {
 
 
             console.log(
-              "【原因追及 区間判定】",
-              "fetch=" +
-                diagnostic.fetchDurationMs +
-                "ms",
-              "fetch完了→回答検知=" +
-                diagnostic.answerDetectMs +
-                "ms",
-              "回答検知→TRUE=" +
-                diagnostic.trueAfterDetectMs +
-                "ms",
-              "TRUE→写真=" +
-                diagnostic.photoAfterTrueMs +
-                "ms",
-              "load開始→写真=" +
-                Math.round(totalTime) +
-                "ms"
-            );
-
-
-            console.log(
               "【原因追及 END】"
             );
 
+
+            /*
+               timing_logへ
+               このanswerIdだけ送信
+            */
 
             sendMonitorTiming(
 
@@ -1171,18 +1284,14 @@ async function load() {
 
               diagnostic.trueDisplayMs,
 
-              diagnostic.photoDisplayMs,
-
-              diagnostic.fetchDurationMs,
-
-              diagnostic.answerDetectMs,
-
-              diagnostic.trueAfterDetectMs,
-
-              diagnostic.photoAfterTrueMs
+              diagnostic.photoDisplayMs
 
             );
 
+
+            /*
+               従来の異常PHOTO計測も残す
+            */
 
             if (
               imageLoadTime >= 5000 ||
@@ -1221,6 +1330,11 @@ async function load() {
           };
 
 
+        /*
+           すでに画像が読み込み済みなら
+           画面表示直後として記録
+        */
+
         if (
           img.complete
         ) {
@@ -1244,13 +1358,7 @@ async function load() {
 
               console.error(
                 "【PHOTOエラー】",
-                imageSrc,
-                "load開始から=" +
-                Math.round(
-                  performance.now() -
-                  imageStart
-                ) +
-                "ms"
+                imageSrc
               );
 
             },
@@ -1265,6 +1373,10 @@ async function load() {
     );
 
 
+    /* =====================================================
+       新回答を既知として登録
+       ===================================================== */
+
     newDiagnostics.forEach(
       diagnostic => {
 
@@ -1276,6 +1388,10 @@ async function load() {
       }
     );
 
+
+    /* =====================================================
+       LOAD全体
+       ===================================================== */
 
     const loadEnd =
       performance.now();
@@ -1303,6 +1419,11 @@ async function load() {
 
 }
 
+
+/* =========================================================
+   モニター更新
+   1秒ごと
+   ========================================================= */
 
 async function monitorLoop() {
 

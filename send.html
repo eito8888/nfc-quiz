@@ -43,7 +43,9 @@ function showDiagnostic(lines){debugDiv.innerText=lines.join("\n");}
 function ms(v){return typeof v==="number"&&Number.isFinite(v)?Math.round(v):"取得不可";}
 function getBrowserState(){
   let c=null;
-  try{c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;}catch(e){}
+  try{
+    c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
+  }catch(e){}
   return{
     online:navigator.onLine,
     visibility:document.visibilityState,
@@ -122,6 +124,10 @@ function send(){
 
   const fetchStart=performance.now();
   const fetchStartMs=Date.now();
+
+  // ★追加：送信開始 → fetch開始
+  const sendToFetchStartMs=Math.round(fetchStart-measureStart);
+
   const url=`${GAS_URL}?player=${encodeURIComponent(player)}`+
     `&selected=${encodeURIComponent(selected)}`+
     `&number=${encodeURIComponent(sendNumber)}`+
@@ -131,33 +137,71 @@ function send(){
 
   const controller=new AbortController();
   let timeoutFired=false;
+
   const timeoutId=setTimeout(()=>{
     timeoutFired=true;
     const timeoutNow=Date.now();
     const elapsed=performance.now()-measureStart;
+
+    // ★追加：fetch開始 → TIMEOUT
+    const fetchToTimeoutMs=Math.round(performance.now()-fetchStart);
+
     const rt=getResourceTiming(GAS_URL);
     const bs=getBrowserState();
+
     let diagnosis="判定不能";
-    if(rt&&rt.responseStart>0) diagnosis="HTTP response開始まで確認済み";
-    else if(rt&&rt.requestStart>0) diagnosis="HTTP request開始まで確認済み。request開始後→response開始前を疑う";
-    else if(rt&&rt.connectStart>0) diagnosis="接続開始まで確認済み。接続→request開始付近を疑う";
-    else if(rt&&rt.fetchStart>0) diagnosis="fetch開始は確認済み。request開始以前を疑う（またはTiming制限）";
-    else if(bs.online===false) diagnosis="TIMEOUT時点でnavigator.onLine=false";
-    else diagnosis="GAS HTTP応答なし。Resource Timingにも通信進行なし";
+    if(rt&&rt.responseStart>0)
+      diagnosis="HTTP response開始まで確認済み";
+    else if(rt&&rt.requestStart>0)
+      diagnosis="HTTP request開始まで確認済み。request開始後→response開始前を疑う";
+    else if(rt&&rt.connectStart>0)
+      diagnosis="接続開始まで確認済み。接続→request開始付近を疑う";
+    else if(rt&&rt.fetchStart>0)
+      diagnosis="fetch開始は確認済み。request開始以前を疑う（またはTiming制限）";
+    else if(bs.online===false)
+      diagnosis="TIMEOUT時点でnavigator.onLine=false";
+    else
+      diagnosis="GAS HTTP応答なし。Resource Timingにも通信進行なし";
 
     msgDiv.innerText="📩 送信確認中";
+
     showDiagnostic([
       "【送信診断】TIMEOUT",
+      "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+      "fetch開始 → TIMEOUT："+fetchToTimeoutMs+" ms",
       "送信開始 → TIMEOUT："+Math.round(elapsed)+" ms",
-      "fetch開始 → TIMEOUT："+Math.round(performance.now()-fetchStart)+" ms",
       "15秒以内にGASからHTTP応答なし",
       "answerId：取得できず",
       "【今回の重要判定】"+diagnosis,
       ...browserLines(bs),
       ...resourceLines(rt)
     ]);
-    const diagnostic={result:"TIMEOUT",time:startTime,sendStartMs,fetchStartMs,errorMs:timeoutNow,elapsedMs:Math.round(elapsed),player,selected,number:sendNumber,tagStage,diagnosis,browserState:bs,resourceTiming:rt,timeoutUrl:url};
-    saveLastDiagnostic(diagnostic);saveSendRecord(diagnostic);
+
+    const diagnostic={
+      result:"TIMEOUT",
+      time:startTime,
+      sendStartMs,
+      fetchStartMs,
+      errorMs:timeoutNow,
+      elapsedMs:Math.round(elapsed),
+
+      // ★追加
+      sendToFetchStartMs,
+      fetchToTimeoutMs,
+
+      player,
+      selected,
+      number:sendNumber,
+      tagStage,
+      diagnosis,
+      browserState:bs,
+      resourceTiming:rt,
+      timeoutUrl:url
+    };
+
+    saveLastDiagnostic(diagnostic);
+    saveSendRecord(diagnostic);
+
     controller.abort();
   },15000);
 
@@ -165,37 +209,69 @@ function send(){
   .then(response=>{
     const responseMs=Date.now();
     const responseElapsed=performance.now()-measureStart;
+
     window.__sendResponseMs=responseMs;
     window.__sendResponseElapsed=responseElapsed;
     window.__sendResponseStatus=response.status;
+
     clearTimeout(timeoutId);
+
     console.log("【SEND GAS応答】",response.status,responseMs,responseElapsed);
+
     if(!response.ok)throw new Error("HTTP "+response.status);
     return response.json();
   })
   .then(data=>{
     const jsonEnd=performance.now();
     const jsonEndMs=Date.now();
+
     const fetchTime=jsonEnd-fetchStart;
     const responseElapsed=window.__sendResponseElapsed||0;
+
     const gasReceiveMs=Number(data.gasReceiveMs)||0;
     const gasCompleteMs=Number(data.gasCompleteMs)||0;
     const answerId=String(data.answerId||"").trim();
-    const gasInternalMs=(gasReceiveMs&&gasCompleteMs)?gasCompleteMs-gasReceiveMs:0;
-    const sendToGasReceiveMs=gasReceiveMs?Math.round(gasReceiveMs-sendStartMs):0;
-    const gasCompleteToResponseMs=gasCompleteMs&&window.__sendResponseMs?Math.round(window.__sendResponseMs-gasCompleteMs):0;
-    const gasOutsideMs=Math.max(0,Math.round(fetchTime-gasInternalMs));
+
+    const gasInternalMs=(gasReceiveMs&&gasCompleteMs)
+      ?gasCompleteMs-gasReceiveMs:0;
+
+    const sendToGasReceiveMs=gasReceiveMs
+      ?Math.round(gasReceiveMs-sendStartMs):0;
+
+    // ★追加：fetch開始 → GAS受信
+    const fetchToGasReceiveMs=gasReceiveMs
+      ?Math.round(gasReceiveMs-fetchStartMs):0;
+
+    const gasCompleteToResponseMs=gasCompleteMs&&window.__sendResponseMs
+      ?Math.round(window.__sendResponseMs-gasCompleteMs):0;
+
+    const gasOutsideMs=Math.max(
+      0,
+      Math.round(fetchTime-gasInternalMs)
+    );
+
     const sentDisplayMs=Date.now();
     const sendDisplayTime=performance.now()-measureStart;
-    const jsonParseMs=Math.max(0,Math.round(jsonEnd-(measureStart+responseElapsed)));
+
+    const jsonParseMs=Math.max(
+      0,
+      Math.round(jsonEnd-(measureStart+responseElapsed))
+    );
+
     const rt=getResourceTiming(GAS_URL);
     const bs=getBrowserState();
     const status=window.__sendResponseStatus;
 
     msgDiv.innerText="📩 送信しました！";
+
     showDiagnostic([
       "【今回の送信診断】",
       "answerId："+answerId,
+
+      // ★追加
+      "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+      "fetch開始 → GAS受信："+fetchToGasReceiveMs+" ms",
+
       "fetch開始 → GAS応答："+Math.round(fetchTime)+" ms",
       "送信開始 → GAS受信（目安）："+sendToGasReceiveMs+" ms",
       "GAS受信 → GAS処理完了："+Math.round(gasInternalMs)+" ms",
@@ -208,44 +284,168 @@ function send(){
       ...resourceLines(rt)
     ]);
 
-    const diagnostic={result:"GAS_RESPONSE",time:startTime,sendStartMs,fetchStartMs,responseMs:window.__sendResponseMs||0,jsonEndMs,sentDisplayMs,answerId,player,selected,dog,number:sendNumber,tagStage,fetchMs:Math.round(fetchTime),gasInternalMs:Math.round(gasInternalMs),sendToGasReceiveMs,gasCompleteToResponseMs,gasOutsideMs,sendToDisplayMs:Math.round(sendDisplayTime),httpStatus:status,jsonParseMs,browserState:bs,resourceTiming:rt};
-    saveLastDiagnostic(diagnostic);saveSendRecord(diagnostic);
+    const diagnostic={
+      result:"GAS_RESPONSE",
+      time:startTime,
+      sendStartMs,
+      fetchStartMs,
+      responseMs:window.__sendResponseMs||0,
+      jsonEndMs,
+      sentDisplayMs,
+      answerId,
+      player,
+      selected,
+      dog,
+      number:sendNumber,
+      tagStage,
+      fetchMs:Math.round(fetchTime),
+      gasInternalMs:Math.round(gasInternalMs),
+      sendToGasReceiveMs,
+
+      // ★追加
+      sendToFetchStartMs,
+      fetchToGasReceiveMs,
+
+      gasCompleteToResponseMs,
+      gasOutsideMs,
+      sendToDisplayMs:Math.round(sendDisplayTime),
+      httpStatus:status,
+      jsonParseMs,
+      browserState:bs,
+      resourceTiming:rt
+    };
+
+    saveLastDiagnostic(diagnostic);
+    saveSendRecord(diagnostic);
 
     if(answerId){
       const displayUrl=`${GAS_URL}?event=sentDisplay&answerId=${encodeURIComponent(answerId)}&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}&_=${Date.now()}`;
-      fetch(displayUrl,{method:"GET",cache:"no-store"}).catch(e=>console.error("【SEND sentDisplay送信エラー】",e));
+
+      fetch(displayUrl,{method:"GET",cache:"no-store"})
+        .catch(e=>console.error("【SEND sentDisplay送信エラー】",e));
     }
-    setTimeout(()=>{location.href="player.html";},15000);
+
+    setTimeout(()=>{
+      location.href="player.html";
+    },15000);
   })
   .catch(async error=>{
     clearTimeout(timeoutId);
+
     const errorTime=performance.now()-measureStart;
     const errorMs=Date.now();
+
     sessionStorage.setItem(sendKey,"sent");
+
     const isTimeout=error&&error.name==="AbortError";
+
     if(isTimeout){
       await new Promise(r=>setTimeout(r,300));
-      const rt=getResourceTiming(GAS_URL);const bs=getBrowserState();
+
+      const rt=getResourceTiming(GAS_URL);
+      const bs=getBrowserState();
+
       let diagnosis="判定不能";
-      if(rt&&rt.responseStart>0) diagnosis="HTTP response開始まで確認済み";
-      else if(rt&&rt.requestStart>0) diagnosis="HTTP request開始まで確認済み。request開始後→response開始前を疑う";
-      else if(rt&&rt.connectStart>0) diagnosis="接続開始まで確認済み。接続→request開始付近を疑う";
-      else if(rt&&rt.fetchStart>0) diagnosis="fetch開始は確認済み。request開始以前を疑う（またはTiming制限）";
-      else if(bs.online===false) diagnosis="TIMEOUT時点でnavigator.onLine=false";
-      else diagnosis="GAS HTTP応答なし。Resource Timingにも通信進行なし";
+
+      if(rt&&rt.responseStart>0)
+        diagnosis="HTTP response開始まで確認済み";
+      else if(rt&&rt.requestStart>0)
+        diagnosis="HTTP request開始まで確認済み。request開始後→response開始前を疑う";
+      else if(rt&&rt.connectStart>0)
+        diagnosis="接続開始まで確認済み。接続→request開始付近を疑う";
+      else if(rt&&rt.fetchStart>0)
+        diagnosis="fetch開始は確認済み。request開始以前を疑う（またはTiming制限）";
+      else if(bs.online===false)
+        diagnosis="TIMEOUT時点でnavigator.onLine=false";
+      else
+        diagnosis="GAS HTTP応答なし。Resource Timingにも通信進行なし";
+
       msgDiv.innerText="📩 送信確認中";
-      showDiagnostic(["【送信診断】TIMEOUT","送信開始 → TIMEOUT："+Math.round(errorTime)+" ms","15秒以内にGASからHTTP応答なし","answerId：取得できず","【今回の重要判定】"+diagnosis,...browserLines(bs),...resourceLines(rt)]);
-      const diagnostic={result:"TIMEOUT",time:startTime,sendStartMs,fetchStartMs,errorMs,elapsedMs:Math.round(errorTime),player,selected,number:sendNumber,tagStage,diagnosis,browserState:bs,resourceTiming:rt,timeoutUrl:url};
-      saveLastDiagnostic(diagnostic);saveSendRecord(diagnostic);
+
+      showDiagnostic([
+        "【送信診断】TIMEOUT",
+        "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+        "fetch開始 → TIMEOUT："+Math.round(performance.now()-fetchStart)+" ms",
+        "送信開始 → TIMEOUT："+Math.round(errorTime)+" ms",
+        "15秒以内にGASからHTTP応答なし",
+        "answerId：取得できず",
+        "【今回の重要判定】"+diagnosis,
+        ...browserLines(bs),
+        ...resourceLines(rt)
+      ]);
+
+      const diagnostic={
+        result:"TIMEOUT",
+        time:startTime,
+        sendStartMs,
+        fetchStartMs,
+        errorMs,
+        elapsedMs:Math.round(errorTime),
+
+        // ★追加
+        sendToFetchStartMs,
+        fetchToTimeoutMs:Math.round(performance.now()-fetchStart),
+
+        player,
+        selected,
+        number:sendNumber,
+        tagStage,
+        diagnosis,
+        browserState:bs,
+        resourceTiming:rt,
+        timeoutUrl:url
+      };
+
+      saveLastDiagnostic(diagnostic);
+      saveSendRecord(diagnostic);
+
     }else{
-      const rt=getResourceTiming(GAS_URL);const bs=getBrowserState();
+      const rt=getResourceTiming(GAS_URL);
+      const bs=getBrowserState();
+
       msgDiv.innerText="📩 送信しました！";
-      showDiagnostic(["【送信診断】通信ERROR","送信開始 → ERROR："+Math.round(errorTime)+" ms","error："+String(error),"error.name："+(error&&error.name?error.name:"取得不可"),"answerId：取得できず",...browserLines(bs),...resourceLines(rt)]);
-      saveLastDiagnostic({result:"ERROR",time:startTime,sendStartMs,fetchStartMs,errorMs,elapsedMs:Math.round(errorTime),errorMessage:String(error),errorName:error&&error.name?error.name:"",player,selected,number:sendNumber,tagStage,browserState:bs,resourceTiming:rt});
+
+      showDiagnostic([
+        "【送信診断】通信ERROR",
+        "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+        "fetch開始 → ERROR："+Math.round(performance.now()-fetchStart)+" ms",
+        "送信開始 → ERROR："+Math.round(errorTime)+" ms",
+        "error："+String(error),
+        "error.name："+(error&&error.name?error.name:"取得不可"),
+        "answerId：取得できず",
+        ...browserLines(bs),
+        ...resourceLines(rt)
+      ]);
+
+      saveLastDiagnostic({
+        result:"ERROR",
+        time:startTime,
+        sendStartMs,
+        fetchStartMs,
+        errorMs,
+        elapsedMs:Math.round(errorTime),
+
+        // ★追加
+        sendToFetchStartMs,
+        fetchToErrorMs:Math.round(performance.now()-fetchStart),
+
+        errorMessage:String(error),
+        errorName:error&&error.name?error.name:"",
+        player,
+        selected,
+        number:sendNumber,
+        tagStage,
+        browserState:bs,
+        resourceTiming:rt
+      });
     }
-    setTimeout(()=>{location.href="player.html";},15000);
+
+    setTimeout(()=>{
+      location.href="player.html";
+    },15000);
   });
 }
+
 send();
 </script>
 </body>

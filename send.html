@@ -43,9 +43,7 @@ function showDiagnostic(lines){debugDiv.innerText=lines.join("\n");}
 function ms(v){return typeof v==="number"&&Number.isFinite(v)?Math.round(v):"取得不可";}
 function getBrowserState(){
   let c=null;
-  try{
-    c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;
-  }catch(e){}
+  try{c=navigator.connection||navigator.mozConnection||navigator.webkitConnection;}catch(e){}
   return{
     online:navigator.onLine,
     visibility:document.visibilityState,
@@ -112,10 +110,18 @@ function send(){
   const measureStart=performance.now();
   const sendStartMs=Date.now();
   const startTime=new Date(sendStartMs).toISOString();
+
+  // ★追加：send.htmlのページ開始 → send()開始
+  const pageStartMs=performance.timeOrigin;
+  const pageToSendStartMs=Math.max(0,Math.round(sendStartMs-pageStartMs));
+
   const browserState=getBrowserState();
+
   console.log("【SEND開始】",sendStartMs,player,selected,sendNumber,tagStage);
+  console.log("【ページ開始→SEND開始】",pageToSendStartMs,"ms");
 
   msgDiv.innerText="📡 送信中…";
+
   if(sessionStorage.getItem(sendKey)==="sending"){
     debugDiv.innerText="二重送信防止";
     return;
@@ -125,7 +131,7 @@ function send(){
   const fetchStart=performance.now();
   const fetchStartMs=Date.now();
 
-  // ★追加：送信開始 → fetch開始
+  // 既存：send()開始 → fetch開始
   const sendToFetchStartMs=Math.round(fetchStart-measureStart);
 
   const url=`${GAS_URL}?player=${encodeURIComponent(player)}`+
@@ -140,16 +146,17 @@ function send(){
 
   const timeoutId=setTimeout(()=>{
     timeoutFired=true;
+
     const timeoutNow=Date.now();
     const elapsed=performance.now()-measureStart;
 
-    // ★追加：fetch開始 → TIMEOUT
     const fetchToTimeoutMs=Math.round(performance.now()-fetchStart);
 
     const rt=getResourceTiming(GAS_URL);
     const bs=getBrowserState();
 
     let diagnosis="判定不能";
+
     if(rt&&rt.responseStart>0)
       diagnosis="HTTP response開始まで確認済み";
     else if(rt&&rt.requestStart>0)
@@ -167,7 +174,8 @@ function send(){
 
     showDiagnostic([
       "【送信診断】TIMEOUT",
-      "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+      "ページ開始 → send()開始："+pageToSendStartMs+" ms",
+      "send()開始 → fetch開始："+sendToFetchStartMs+" ms",
       "fetch開始 → TIMEOUT："+fetchToTimeoutMs+" ms",
       "送信開始 → TIMEOUT："+Math.round(elapsed)+" ms",
       "15秒以内にGASからHTTP応答なし",
@@ -180,12 +188,14 @@ function send(){
     const diagnostic={
       result:"TIMEOUT",
       time:startTime,
+      pageStartMs,
       sendStartMs,
       fetchStartMs,
       errorMs:timeoutNow,
       elapsedMs:Math.round(elapsed),
 
       // ★追加
+      pageToSendStartMs,
       sendToFetchStartMs,
       fetchToTimeoutMs,
 
@@ -238,7 +248,7 @@ function send(){
     const sendToGasReceiveMs=gasReceiveMs
       ?Math.round(gasReceiveMs-sendStartMs):0;
 
-    // ★追加：fetch開始 → GAS受信
+    // 既存：fetch開始 → GAS受信
     const fetchToGasReceiveMs=gasReceiveMs
       ?Math.round(gasReceiveMs-fetchStartMs):0;
 
@@ -268,8 +278,11 @@ function send(){
       "【今回の送信診断】",
       "answerId："+answerId,
 
-      // ★追加
-      "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+      // ★今回追加
+      "ページ開始 → send()開始："+pageToSendStartMs+" ms",
+
+      // 既存
+      "send()開始 → fetch開始："+sendToFetchStartMs+" ms",
       "fetch開始 → GAS受信："+fetchToGasReceiveMs+" ms",
 
       "fetch開始 → GAS応答："+Math.round(fetchTime)+" ms",
@@ -287,6 +300,11 @@ function send(){
     const diagnostic={
       result:"GAS_RESPONSE",
       time:startTime,
+
+      // ★追加
+      pageStartMs,
+      pageToSendStartMs,
+
       sendStartMs,
       fetchStartMs,
       responseMs:window.__sendResponseMs||0,
@@ -302,7 +320,7 @@ function send(){
       gasInternalMs:Math.round(gasInternalMs),
       sendToGasReceiveMs,
 
-      // ★追加
+      // 既存
       sendToFetchStartMs,
       fetchToGasReceiveMs,
 
@@ -364,7 +382,8 @@ function send(){
 
       showDiagnostic([
         "【送信診断】TIMEOUT",
-        "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+        "ページ開始 → send()開始："+pageToSendStartMs+" ms",
+        "send()開始 → fetch開始："+sendToFetchStartMs+" ms",
         "fetch開始 → TIMEOUT："+Math.round(performance.now()-fetchStart)+" ms",
         "送信開始 → TIMEOUT："+Math.round(errorTime)+" ms",
         "15秒以内にGASからHTTP応答なし",
@@ -377,12 +396,17 @@ function send(){
       const diagnostic={
         result:"TIMEOUT",
         time:startTime,
+
+        // ★追加
+        pageStartMs,
+        pageToSendStartMs,
+
         sendStartMs,
         fetchStartMs,
         errorMs,
         elapsedMs:Math.round(errorTime),
 
-        // ★追加
+        // 既存
         sendToFetchStartMs,
         fetchToTimeoutMs:Math.round(performance.now()-fetchStart),
 
@@ -407,7 +431,8 @@ function send(){
 
       showDiagnostic([
         "【送信診断】通信ERROR",
-        "送信開始 → fetch開始："+sendToFetchStartMs+" ms",
+        "ページ開始 → send()開始："+pageToSendStartMs+" ms",
+        "send()開始 → fetch開始："+sendToFetchStartMs+" ms",
         "fetch開始 → ERROR："+Math.round(performance.now()-fetchStart)+" ms",
         "送信開始 → ERROR："+Math.round(errorTime)+" ms",
         "error："+String(error),
@@ -420,12 +445,17 @@ function send(){
       saveLastDiagnostic({
         result:"ERROR",
         time:startTime,
+
+        // ★追加
+        pageStartMs,
+        pageToSendStartMs,
+
         sendStartMs,
         fetchStartMs,
         errorMs,
         elapsedMs:Math.round(errorTime),
 
-        // ★追加
+        // 既存
         sendToFetchStartMs,
         fetchToErrorMs:Math.round(performance.now()-fetchStart),
 

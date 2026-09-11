@@ -217,75 +217,53 @@ if (
 
 function sendMonitorTiming(
   answerId,
-  monitorFetchMs,
-  trueDisplayMs,
-  photoDisplayMs
+  diagnostic
 ) {
+  if (!answerId || !diagnostic) return;
+  if (window.monitorTimingSent.has(answerId)) return;
 
-  if (!answerId) {
-    return;
-  }
-
-
-  if (
-    window.monitorTimingSent
-      .has(answerId)
-  ) {
-
-    return;
-  }
-
-
-  const url =
-    GAS_URL +
+  const url = GAS_URL +
     "?event=monitorTiming" +
-    "&answerId=" +
-    encodeURIComponent(answerId) +
-    "&monitorFetchMs=" +
-    encodeURIComponent(monitorFetchMs) +
-    "&trueDisplayMs=" +
-    encodeURIComponent(trueDisplayMs) +
-    "&photoDisplayMs=" +
-    encodeURIComponent(photoDisplayMs) +
-    "&_=" +
-    Date.now();
+    "&answerId=" + encodeURIComponent(answerId) +
+    "&monitorFetchMs=" + encodeURIComponent(diagnostic.monitorFetchMs || 0) +
+    "&trueDisplayMs=" + encodeURIComponent(diagnostic.trueDisplayMs || 0) +
+    "&photoDisplayMs=" + encodeURIComponent(diagnostic.photoDisplayMs || 0) +
+    "&monitorFetchStartWallMs=" + encodeURIComponent(diagnostic.monitorFetchStartWallMs || 0) +
+    "&monitorFetchEndWallMs=" + encodeURIComponent(diagnostic.monitorFetchEndWallMs || 0) +
+    "&monitorFetchDurationMs=" + encodeURIComponent(diagnostic.monitorFetchDurationMs || 0) +
+    "&jsonTimeMs=" + encodeURIComponent(diagnostic.jsonTimeMs || 0) +
+    "&fetchEndToDetectMs=" + encodeURIComponent(diagnostic.fetchEndToDetectMs || 0) +
+    "&detectToTrueMs=" + encodeURIComponent(diagnostic.detectToTrueMs || 0) +
+    "&trueToPhotoMs=" + encodeURIComponent(diagnostic.trueToPhotoMs || 0) +
+    "&imageLoadTimeMs=" + encodeURIComponent(diagnostic.imageLoadTimeMs || 0) +
+    "&loadToPhotoMs=" + encodeURIComponent(diagnostic.loadToPhotoMs || 0) +
+    "&monitorStatus=" + encodeURIComponent(diagnostic.monitorStatus || "OK") +
+    "&_=" + Date.now();
+
+  fetch(url, {method:"GET", cache:"no-store"})
+    .then(() => {
+      window.monitorTimingSent.add(answerId);
+      console.log("【原因追及 timing_log送信完了】", "answerId=" + answerId);
+    })
+    .catch(error => console.error("【原因追及 timing_log送信エラー】", error));
+}
 
 
-  fetch(
-    url,
-    {
-      method: "GET",
-      cache: "no-store"
-    }
-  )
 
-  .then(
-    () => {
+/* =========================================================
+   Monitor取得TIMEOUT記録
+   1回のGAS取得が8秒を超えた場合だけ記録
+   ========================================================= */
+function sendMonitorTimeout(startWallMs, elapsedMs, errorName) {
+  const url = GAS_URL +
+    "?event=monitorTimeout" +
+    "&monitorFetchStartWallMs=" + encodeURIComponent(startWallMs) +
+    "&monitorTimeoutMs=" + encodeURIComponent(elapsedMs) +
+    "&monitorError=" + encodeURIComponent(errorName || "TIMEOUT") +
+    "&_=" + Date.now();
 
-      window.monitorTimingSent
-        .add(answerId);
-
-
-      console.log(
-        "【原因追及 timing_log送信完了】",
-        "answerId=" +
-        answerId
-      );
-
-    }
-  )
-
-  .catch(
-    error => {
-
-      console.error(
-        "【原因追及 timing_log送信エラー】",
-        error
-      );
-
-    }
-  );
-
+  fetch(url, {method:"GET", cache:"no-store"})
+    .catch(error => console.error("【原因追及 MonitorTimeout記録エラー】", error));
 }
 
 
@@ -312,20 +290,33 @@ async function load() {
       Date.now();
 
 
-    const res =
-      await fetch(
-        GAS_URL,
-        {
-          cache: "no-store"
-        }
-      );
+    const monitorController = new AbortController();
+    const monitorTimeoutMs = 8000;
+    const monitorTimeoutId = setTimeout(() => monitorController.abort(), monitorTimeoutMs);
+    let res;
 
+    try {
+      res = await fetch(GAS_URL, {
+        cache: "no-store",
+        signal: monitorController.signal
+      });
+    } catch (fetchError) {
+      clearTimeout(monitorTimeoutId);
+      const elapsed = performance.now() - fetchStart;
+      const name = fetchError && fetchError.name ? fetchError.name : "fetchError";
+      if (name === "AbortError") {
+        console.error("【原因追及 Monitor FETCH TIMEOUT】", Math.round(elapsed) + "ms");
+        sendMonitorTimeout(fetchStartWallMs, Math.round(elapsed), "AbortError");
+      } else {
+        console.error("【原因追及 Monitor FETCH ERROR】", name, Math.round(elapsed) + "ms");
+      }
+      return;
+    }
 
-    const fetchEnd =
-      performance.now();
+    clearTimeout(monitorTimeoutId);
 
-    const fetchEndWallMs =
-      Date.now();
+    const fetchEnd = performance.now();
+    const fetchEndWallMs = Date.now();
 
 
     /* -----------------------------------------
@@ -664,6 +655,30 @@ async function load() {
                 photoDisplayMs:
                   0,
 
+                monitorFetchDurationMs:
+                  Math.round(fetchEnd - fetchStart),
+
+                jsonTimeMs:
+                  Math.round(jsonTime),
+
+                fetchEndToDetectMs:
+                  0,
+
+                detectToTrueMs:
+                  0,
+
+                trueToPhotoMs:
+                  0,
+
+                imageLoadTimeMs:
+                  0,
+
+                loadToPhotoMs:
+                  0,
+
+                monitorStatus:
+                  "OK",
+
                 trueLogged:
                   false,
 
@@ -725,6 +740,11 @@ async function load() {
 
               const answerDetectedWallMs =
                 diagnostic.answerDetectedWallMs;
+
+              diagnostic.fetchEndToDetectMs = Math.max(
+                0,
+                answerDetectedWallMs - diagnostic.monitorFetchEndWallMs
+              );
 
               const fetchDurationMs =
                 diagnostic.monitorFetchEndWallMs -
@@ -1007,6 +1027,11 @@ async function load() {
         diagnostic.trueDisplayMs =
           trueDisplayMs;
 
+        diagnostic.detectToTrueMs = Math.max(
+          0,
+          trueDisplayMs - diagnostic.answerDetectedWallMs
+        );
+
 
         diagnostic.trueLogged =
           true;
@@ -1276,16 +1301,13 @@ async function load() {
                このanswerIdだけ送信
             */
 
+            diagnostic.trueToPhotoMs = Math.max(0, diagnostic.photoDisplayMs - diagnostic.trueDisplayMs);
+            diagnostic.imageLoadTimeMs = Math.round(imageLoadTime);
+            diagnostic.loadToPhotoMs = Math.round(totalTime);
+
             sendMonitorTiming(
-
               diagnostic.answerId,
-
-              diagnostic.monitorFetchMs,
-
-              diagnostic.trueDisplayMs,
-
-              diagnostic.photoDisplayMs
-
+              diagnostic
             );
 
 

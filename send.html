@@ -2,43 +2,38 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>送信中...</title>
 
 <style>
-body {
-  font-family: sans-serif;
-  text-align: center;
-  padding-top: 25px;
-  margin: 0;
+body{
+  font-family:sans-serif;
+  text-align:center;
+  padding-top:25px;
+  margin:0;
 }
 
-h1 {
-  font-size: 42px;
-  margin: 0 0 18px;
+#msg{
+  font-size:36px;
+  font-weight:bold;
+  margin:0 0 20px;
 }
 
-#msg {
-  font-size: 38px;
-  font-weight: bold;
-  margin-top: 10px;
-}
-
-#debug {
-  margin: 18px auto 0;
-  font-size: 22px;
-  line-height: 1.25;
-  font-weight: bold;
-  white-space: pre-line;
-  text-align: left;
-  padding: 0 12px;
-  max-width: 900px;
+#debug{
+  font-size:18px;
+  line-height:1.35;
+  white-space:pre-line;
+  text-align:left;
+  padding:0 12px;
+  max-width:900px;
+  margin:auto;
 }
 </style>
 </head>
 
 <body>
 
-<h1 id="msg">📡 送信中…</h1>
+<div id="msg">📡 送信中…</div>
 <div id="debug"></div>
 
 <script>
@@ -46,19 +41,16 @@ h1 {
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const msgDiv =
-document.getElementById("msg");
+const msg = document.getElementById("msg");
+const debug = document.getElementById("debug");
 
-const debugDiv =
-document.getElementById("debug");
-
+const pageStartMs = Date.now();
 
 const player =
 localStorage.getItem("player");
 
 const selected =
 localStorage.getItem("selectedNumber");
-
 
 const params =
 new URLSearchParams(location.search);
@@ -76,6 +68,12 @@ const sendNumber =
 number || dog;
 
 
+/*
+=========================================================
+二重送信防止
+=========================================================
+*/
+
 const sendKey =
 "sending_" +
 String(player || "") + "_" +
@@ -84,29 +82,45 @@ String(sendNumber || "") + "_" +
 String(tagStage || "");
 
 
-/* =========================================================
-   診断保存
-   ========================================================= */
+if(
+  sessionStorage.getItem(sendKey) === "sending" ||
+  sessionStorage.getItem(sendKey) === "sent"
+){
+  msg.innerText = "📩 送信しました！";
+  debug.innerText = "二重送信防止";
+}else{
 
-function saveSendRecord(record) {
+  sessionStorage.setItem(
+    sendKey,
+    "sending"
+  );
 
-  try {
+  startSend();
 
-    const key =
-    "NFC_SEND_HISTORY";
+}
+
+
+/*
+=========================================================
+診断保存
+=========================================================
+*/
+
+function saveHistory(data){
+
+  try{
+
+    const key = "NFC_SEND_HISTORY";
 
     let history =
-    JSON.parse(
-      localStorage.getItem(key) || "[]"
-    );
+      JSON.parse(
+        localStorage.getItem(key) || "[]"
+      );
 
-    history.push(record);
+    history.push(data);
 
-    if (history.length > 100) {
-
-      history =
-      history.slice(-100);
-
+    if(history.length > 100){
+      history = history.slice(-100);
     }
 
     localStorage.setItem(
@@ -114,10 +128,10 @@ function saveSendRecord(record) {
       JSON.stringify(history)
     );
 
-  } catch(e) {
+  }catch(e){
 
-    console.error(
-      "【診断保存ERROR】",
+    console.log(
+      "history save error",
       e
     );
 
@@ -126,92 +140,99 @@ function saveSendRecord(record) {
 }
 
 
-/* =========================================================
-   送信
-   ========================================================= */
+/*
+=========================================================
+「送信しました」時刻をGASへ通知
+=========================================================
+*/
 
-function send() {
-
-  const measureStart =
-  performance.now();
-
-  const sendStartMs =
-  Date.now();
-
-  const startTime =
-  new Date(sendStartMs).toISOString();
-
-
-  msgDiv.innerText =
-  "📡 送信中…";
-
-
-  /*
-     二重送信防止
-  */
-
-  if (
-    sessionStorage.getItem(sendKey)
-    === "sending"
-  ) {
-
-    debugDiv.innerText =
-    "二重送信防止";
-
-    return;
-
-  }
-
-
-  sessionStorage.setItem(
-    sendKey,
-    "sending"
-  );
-
-
-  /*
-     fetch開始
-  */
-
-  const fetchStart =
-  performance.now();
-
-  const fetchStartMs =
-  Date.now();
-
-
-  const sendToFetchMs =
-  Math.max(
-    0,
-    Math.round(
-      fetchStartMs -
-      sendStartMs
-    )
-  );
-
-
-  /*
-     GASへ送る
-
-     15秒Abortは入れない。
-     ここではGASへの1回の送信を
-     最後まで成立させる。
-  */
+function sendSentDisplay(
+  answerId,
+  sendStartMs,
+  sentDisplayMs
+){
 
   const url =
-    `${GAS_URL}?player=${encodeURIComponent(player)}` +
-    `&selected=${encodeURIComponent(selected)}` +
-    `&number=${encodeURIComponent(sendNumber)}` +
-    `&tagStage=${encodeURIComponent(tagStage)}` +
-    `&clientSendMs=${encodeURIComponent(sendStartMs)}` +
-    `&_=${Date.now()}`;
+    GAS_URL +
+    "?event=sentDisplay" +
+    "&answerId=" +
+    encodeURIComponent(answerId || "") +
+    "&clientSendMs=" +
+    encodeURIComponent(sendStartMs) +
+    "&sentDisplayMs=" +
+    encodeURIComponent(sentDisplayMs) +
+    "&player=" +
+    encodeURIComponent(player || "") +
+    "&number=" +
+    encodeURIComponent(sendNumber || "") +
+    "&stage=" +
+    encodeURIComponent(tagStage || "") +
+    "&_=" +
+    Date.now();
+
+
+  /*
+    これは診断用。
+    「送信しました」の画面表示を
+    この通信の完了待ちにはしない。
+  */
+
+  fetch(
+    url,
+    {
+      method:"GET",
+      cache:"no-store",
+      keepalive:true
+    }
+  ).catch(
+    () => {}
+  );
+
+}
+
+
+/*
+=========================================================
+送信本線
+=========================================================
+*/
+
+function startSend(){
+
+  const sendStartMs =
+    Date.now();
+
+  const sendStartPerf =
+    performance.now();
+
+  const fetchStartPerf =
+    performance.now();
+
+  const fetchStartMs =
+    Date.now();
+
+
+  const url =
+    GAS_URL +
+    "?player=" +
+    encodeURIComponent(player || "") +
+    "&selected=" +
+    encodeURIComponent(selected || "") +
+    "&number=" +
+    encodeURIComponent(sendNumber || "") +
+    "&tagStage=" +
+    encodeURIComponent(tagStage || "") +
+    "&clientSendMs=" +
+    encodeURIComponent(sendStartMs) +
+    "&_=" +
+    Date.now();
 
 
   fetch(
     url,
     {
-      method: "GET",
-      cache: "no-store"
+      method:"GET",
+      cache:"no-store"
     }
   )
 
@@ -219,164 +240,53 @@ function send() {
     response => {
 
       const responseMs =
-      Date.now();
+        Date.now();
 
-      const responseElapsed =
-      performance.now() -
-      measureStart;
-
-
-      /*
-         HTTP状態を保存
-      */
-
-      window.__sendResponseMs =
-      responseMs;
-
-      window.__sendResponseStatus =
-      response.status;
-
-
-      /*
-         HTTP応答が来たら、
-         すぐJSONを読む
-      */
-
-      if (!response.ok) {
+      if(!response.ok){
 
         throw new Error(
-          "HTTP " +
-          response.status
+          "HTTP " + response.status
         );
 
       }
 
-
-      return response.json();
+      return response.json()
+        .then(
+          data => ({
+            data:data,
+            responseMs:responseMs
+          })
+        );
 
     }
   )
 
   .then(
-    data => {
+    result => {
 
-      const jsonEnd =
-      performance.now();
+      const data =
+        result.data;
 
-      const jsonEndMs =
-      Date.now();
-
-
-      const fetchTime =
-      jsonEnd -
-      fetchStart;
-
-
-      const answerId =
-      String(
-        data.answerId || ""
-      ).trim();
-
-
-      /*
-         GAS側の計測値
-      */
-
-      const gasReceiveMs =
-      Number(
-        data.gasReceiveMs
-      ) || 0;
-
-      const gasCompleteMs =
-      Number(
-        data.gasCompleteMs
-      ) || 0;
-
-
-      const gasInternalMs =
-      (
-        gasReceiveMs &&
-        gasCompleteMs
-      )
-        ? gasCompleteMs -
-          gasReceiveMs
-        : 0;
-
-
-      const fetchToGasReceiveMs =
-      (
-        gasReceiveMs &&
-        fetchStartMs
-      )
-        ? Math.max(
-            0,
-            Math.round(
-              gasReceiveMs -
-              fetchStartMs
-            )
-          )
-        : 0;
-
-
-      const sendToGasReceiveMs =
-      gasReceiveMs
-        ? Math.max(
-            0,
-            Math.round(
-              gasReceiveMs -
-              sendStartMs
-            )
-          )
-        : 0;
-
-
-      const gasCompleteToResponseMs =
-      (
-        gasCompleteMs &&
-        window.__sendResponseMs
-      )
-        ? Math.round(
-            window.__sendResponseMs -
-            gasCompleteMs
-          )
-        : 0;
-
-
-      const gasOutsideMs =
-      Math.max(
-        0,
-        Math.round(
-          fetchTime -
-          gasInternalMs
-        )
-      );
-
+      const responseMs =
+        result.responseMs;
 
       const sentDisplayMs =
-      Date.now();
+        Date.now();
 
-      const sendDisplayTime =
-      performance.now() -
-      measureStart;
+      const elapsedMs =
+        sentDisplayMs -
+        sendStartMs;
 
-
-      const jsonParseMs =
-      Math.max(
-        0,
-        Math.round(
-          jsonEnd -
-          (
-            measureStart +
-            responseElapsed
-          )
-        )
-      );
+      const answerId =
+        String(
+          data.answerId || ""
+        );
 
 
       /*
-         ★最重要
-         HTTP応答が返ったら
-         すぐ「送信しました」
+      ================================================
+      ★ここで即表示
+      ================================================
       */
 
       sessionStorage.setItem(
@@ -384,143 +294,89 @@ function send() {
         "sent"
       );
 
-
-      msgDiv.innerText =
-      "📩 送信しました！";
-
-
-      /*
-         画面には必要最小限だけ表示
-      */
-
-      debugDiv.innerText =
-        "送信開始 → fetch開始：" +
-        sendToFetchMs +
-        " ms\n\n" +
-
-        "fetch開始 → GAS応答：" +
-        Math.round(fetchTime) +
-        " ms\n\n" +
-
-        "送信開始 →「送信しました」：" +
-        Math.round(sendDisplayTime) +
-        " ms\n\n" +
-
-        "HTTP：" +
-        String(
-          window.__sendResponseStatus
-        );
+      msg.innerText =
+        "📩 送信しました！";
 
 
       /*
-         診断データ保存
-
-         ここは画面表示後に行う。
-         診断処理でゲーム本線を止めない。
+      ================================================
+      ★送信→送信しました を記録
+      ================================================
       */
 
-      saveSendRecord({
+      sendSentDisplay(
+        answerId,
+        sendStartMs,
+        sentDisplayMs
+      );
 
-        result:
-        "GAS_RESPONSE",
 
-        time:
-        startTime,
+      /*
+      ローカルにも必ず残す
+      */
+
+      saveHistory({
+
+        result:"GAS_RESPONSE",
+
+        pageStartMs:
+          pageStartMs,
 
         sendStartMs:
-        sendStartMs,
+          sendStartMs,
 
         fetchStartMs:
-        fetchStartMs,
+          fetchStartMs,
 
         responseMs:
-        window.__sendResponseMs || 0,
-
-        jsonEndMs:
-        jsonEndMs,
+          responseMs,
 
         sentDisplayMs:
-        sentDisplayMs,
+          sentDisplayMs,
+
+        sendToSentMs:
+          elapsedMs,
 
         answerId:
-        answerId,
+          answerId,
 
         player:
-        player,
+          player,
 
         selected:
-        selected,
-
-        dog:
-        dog,
+          selected,
 
         number:
-        sendNumber,
+          sendNumber,
 
-        tagStage:
-        tagStage,
-
-        fetchMs:
-        Math.round(fetchTime),
-
-        sendToFetchMs:
-        sendToFetchMs,
-
-        fetchToGasReceiveMs:
-        fetchToGasReceiveMs,
-
-        sendToGasReceiveMs:
-        sendToGasReceiveMs,
-
-        gasInternalMs:
-        Math.round(gasInternalMs),
-
-        gasCompleteToResponseMs:
-        gasCompleteToResponseMs,
-
-        gasOutsideMs:
-        gasOutsideMs,
-
-        sendToDisplayMs:
-        Math.round(
-          sendDisplayTime
-        ),
-
-        httpStatus:
-        window.__sendResponseStatus,
-
-        jsonParseMs:
-        jsonParseMs
+        stage:
+          tagStage
 
       });
 
 
+      debug.innerText =
+        "送信開始 → 送信しました：" +
+        elapsedMs +
+        " ms\n" +
+        "HTTP：" +
+        responseMs;
+
+
       /*
-         ★ここでは
-         sentDisplay用の追加fetchをしない
-
-         これが今回の重要変更。
-      */
-
-
-      /*
-         ★昔の動作へ戻す
-
-         「送信しました」
-         ↓
-         1.5秒
-         ↓
-         player.html
+      ================================================
+      ★「送信しました」を読める時間にする
+      ================================================
       */
 
       setTimeout(
         () => {
 
           location.href =
-          "player.html";
+            "player.html";
 
         },
-        1500
+        2500
       );
 
     }
@@ -529,13 +385,17 @@ function send() {
   .catch(
     error => {
 
-      const errorTime =
-      performance.now() -
-      measureStart;
-
       const errorMs =
-      Date.now();
+        Date.now();
 
+      const elapsedMs =
+        errorMs -
+        sendStartMs;
+
+
+      /*
+        エラーでもゲームを永久停止させない
+      */
 
       sessionStorage.setItem(
         sendKey,
@@ -543,90 +403,70 @@ function send() {
       );
 
 
-      /*
-         エラーでも
-         ゲームを永久停止させない
-      */
-
-      msgDiv.innerText =
-      "📩 送信しました！";
+      msg.innerText =
+        "📩 送信しました！";
 
 
-      debugDiv.innerText =
-        "通信ERROR\n\n" +
-
-        "送信開始 → ERROR：" +
-        Math.round(
-          errorTime
-        ) +
-        " ms\n\n" +
-
-        "error：" +
+      debug.innerText =
+        "送信開始 → 通信終了：" +
+        elapsedMs +
+        " ms\n" +
+        "通信：" +
         String(error);
 
 
-      saveSendRecord({
+      saveHistory({
 
-        result:
-        "ERROR",
+        result:"ERROR",
 
-        time:
-        startTime,
+        pageStartMs:
+          pageStartMs,
 
         sendStartMs:
-        sendStartMs,
-
-        fetchStartMs:
-        fetchStartMs,
+          sendStartMs,
 
         errorMs:
-        errorMs,
+          errorMs,
 
         elapsedMs:
-        Math.round(
-          errorTime
-        ),
+          elapsedMs,
 
-        errorMessage:
-        String(error),
+        error:
+          String(error),
 
         player:
-        player,
+          player,
 
         selected:
-        selected,
+          selected,
 
         number:
-        sendNumber,
+          sendNumber,
 
-        tagStage:
-        tagStage
+        stage:
+          tagStage
 
       });
 
 
       /*
-         エラーでも
-         1.5秒後には次へ
+        エラーでも次の問題へ
       */
 
       setTimeout(
         () => {
 
           location.href =
-          "player.html";
+            "player.html";
 
         },
-        1500
+        2500
       );
 
     }
   );
 
 }
-
-
-send();
 
 </script>
 

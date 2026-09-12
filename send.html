@@ -3,75 +3,140 @@
 <head>
 <meta charset="utf-8">
 <title>送信中...</title>
+
 <style>
-body{font-family:sans-serif;text-align:center;padding-top:25px;margin:0}
-h1{font-size:42px;margin:0 0 18px}
-#msg{font-size:38px;font-weight:bold;margin-top:10px}
-#debug{margin:18px auto 0;font-size:24px;line-height:1.22;font-weight:bold;white-space:pre-line;text-align:left;padding:0 12px;max-width:900px}
+body{
+  font-family:sans-serif;
+  text-align:center;
+  padding-top:12px;
+  margin:0;
+}
+
+h1{
+  font-size:28px;
+  margin:0 0 8px;
+}
+
+#msg{
+  font-size:25px;
+  font-weight:bold;
+  margin-top:4px;
+}
+
+#debug{
+  margin:8px auto 0;
+  font-size:16px;
+  line-height:1.08;
+  font-weight:bold;
+  white-space:pre-line;
+  text-align:left;
+  padding:0 8px;
+  max-width:900px;
+}
 </style>
+
 </head>
+
 <body>
+
 <h1 id="msg">📡 送信中…</h1>
 <div id="debug"></div>
 
+
 <script>
 
-const GAS_URL="https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const msgDiv=document.getElementById("msg");
-const debugDiv=document.getElementById("debug");
+const GAS_URL =
+  "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const player=localStorage.getItem("player");
-const selected=localStorage.getItem("selectedNumber");
 
-const params=new URLSearchParams(location.search);
+const msgDiv =
+  document.getElementById("msg");
 
-const dog=params.get("dog");
-const number=params.get("number");
-const tagStage=params.get("stage");
+const debugDiv =
+  document.getElementById("debug");
 
-const sendNumber=number||dog;
 
-const sendKey=
-  "sending_"+
-  String(player||"")+"_"+
-  String(selected||"")+"_"+
-  String(sendNumber||"")+"_"+
-  String(tagStage||"");
+const player =
+  localStorage.getItem("player");
+
+const selected =
+  localStorage.getItem("selectedNumber");
+
+
+const params =
+  new URLSearchParams(location.search);
+
+
+const dog =
+  params.get("dog");
+
+const number =
+  params.get("number");
+
+const tagStage =
+  params.get("stage");
+
+
+const sendNumber =
+  number || dog;
+
+
+const sendKey =
+  "sending_" +
+  String(player || "") + "_" +
+  String(selected || "") + "_" +
+  String(sendNumber || "") + "_" +
+  String(tagStage || "");
+
+
+const requestIdKey =
+  "requestId_" + sendKey;
 
 
 /* =========================================================
    requestId
-   二重送信対策用
+   二重送信対策
    ========================================================= */
 
-const requestIdKey="requestId_"+sendKey;
-
-let requestId="";
+let requestId = "";
 
 try{
 
-  const saved=
+  const saved =
     JSON.parse(
-      sessionStorage.getItem(requestIdKey)||"null"
+      sessionStorage.getItem(requestIdKey) || "null"
     );
 
   if(
     saved &&
     saved.id &&
-    Date.now()-Number(saved.createdAt||0)<60000
+    Date.now() - Number(saved.createdAt || 0) < 60000
   ){
-    requestId=saved.id;
+
+    requestId =
+      saved.id;
+
   }
 
 }catch(e){}
 
+
 if(!requestId){
 
-  requestId=
-    (window.crypto&&crypto.randomUUID)
-      ?crypto.randomUUID()
-      :"req_"+Date.now()+"_"+Math.random().toString(36).slice(2);
+  requestId =
+    (
+      window.crypto &&
+      crypto.randomUUID
+    )
+      ? crypto.randomUUID()
+      : (
+          "req_" +
+          Date.now() +
+          "_" +
+          Math.random().toString(36).slice(2)
+        );
+
 
   try{
 
@@ -96,17 +161,21 @@ function saveSendRecord(record){
 
   try{
 
-    const key="NFC_SEND_HISTORY";
+    const key =
+      "NFC_SEND_HISTORY";
 
-    let history=
+    let history =
       JSON.parse(
-        localStorage.getItem(key)||"[]"
+        localStorage.getItem(key) || "[]"
       );
 
     history.push(record);
 
-    if(history.length>100){
-      history=history.slice(-100);
+    if(history.length > 100){
+
+      history =
+        history.slice(-100);
+
     }
 
     localStorage.setItem(
@@ -147,9 +216,13 @@ function saveLastDiagnostic(record){
 }
 
 
+/* =========================================================
+   画面表示
+   ========================================================= */
+
 function showDiagnostic(lines){
 
-  debugDiv.innerText=
+  debugDiv.innerText =
     lines.join("\n");
 
 }
@@ -158,11 +231,11 @@ function showDiagnostic(lines){
 function ms(v){
 
   return(
-    typeof v==="number" &&
+    typeof v === "number" &&
     Number.isFinite(v)
   )
-  ?Math.round(v)
-  :"取得不可";
+    ? Math.round(v)
+    : "取得不可";
 
 }
 
@@ -173,20 +246,22 @@ function ms(v){
 
 function getBrowserState(){
 
-  let c=null;
+  let c = null;
 
   try{
 
-    c=
-      navigator.connection||
-      navigator.mozConnection||
+    c =
+      navigator.connection ||
+      navigator.mozConnection ||
       navigator.webkitConnection;
 
   }catch(e){}
 
+
   return{
 
-    online:navigator.onLine,
+    online:
+      navigator.onLine,
 
     visibility:
       document.visibilityState,
@@ -195,63 +270,29 @@ function getBrowserState(){
       document.readyState,
 
     effectiveType:
-      c&&c.effectiveType
-        ?c.effectiveType
-        :"",
+      c && c.effectiveType
+        ? c.effectiveType
+        : "",
 
     downlink:
-      c&&typeof c.downlink==="number"
-        ?c.downlink
-        :null,
+      c && typeof c.downlink === "number"
+        ? c.downlink
+        : null,
 
     rtt:
-      c&&typeof c.rtt==="number"
-        ?c.rtt
-        :null,
+      c && typeof c.rtt === "number"
+        ? c.rtt
+        : null,
 
     saveData:
-      c&&typeof c.saveData==="boolean"
-        ?c.saveData
-        :null,
+      c && typeof c.saveData === "boolean"
+        ? c.saveData
+        : null,
 
     userAgent:
       navigator.userAgent
 
   };
-
-}
-
-
-function browserLines(s){
-
-  return[
-
-    "【スマホ・ブラウザ状態】",
-
-    "navigator.onLine："+String(s.online),
-
-    "画面状態："+String(s.visibility),
-
-    "document.readyState："+String(s.readyState),
-
-    "通信方式："+(s.effectiveType||"取得不可"),
-
-    "推定下り速度："+
-      (s.downlink!==null
-        ?s.downlink+" Mbps"
-        :"取得不可"),
-
-    "推定RTT："+
-      (s.rtt!==null
-        ?s.rtt+" ms"
-        :"取得不可"),
-
-    "SaveData："+
-      (s.saveData!==null
-        ?String(s.saveData)
-        :"取得不可")
-
-  ];
 
 }
 
@@ -264,37 +305,55 @@ function getResourceTiming(target){
 
   try{
 
-    const entries=
-      performance.getEntriesByType("resource");
-
-    const list=
-      entries.filter(
-        e=>e.name.indexOf(target)===0
+    const entries =
+      performance.getEntriesByType(
+        "resource"
       );
 
+
+    const list =
+      entries.filter(
+        e =>
+          e.name.indexOf(target) === 0
+      );
+
+
     if(!list.length){
+
       return null;
+
     }
 
+
     list.sort(
-      (a,b)=>b.startTime-a.startTime
+      (a,b) =>
+        b.startTime - a.startTime
     );
 
-    const e=list[0];
+
+    const e =
+      list[0];
+
 
     return{
 
-      startTime:e.startTime,
+      startTime:
+        e.startTime,
 
-      duration:e.duration,
+      duration:
+        e.duration,
 
-      redirectStart:e.redirectStart,
+      redirectStart:
+        e.redirectStart,
 
-      redirectEnd:e.redirectEnd,
+      redirectEnd:
+        e.redirectEnd,
 
-      workerStart:e.workerStart,
+      workerStart:
+        e.workerStart,
 
-      fetchStart:e.fetchStart,
+      fetchStart:
+        e.fetchStart,
 
       domainLookupStart:
         e.domainLookupStart,
@@ -330,10 +389,10 @@ function getResourceTiming(target){
         e.decodedBodySize,
 
       nextHopProtocol:
-        e.nextHopProtocol||"",
+        e.nextHopProtocol || "",
 
       initiatorType:
-        e.initiatorType||""
+        e.initiatorType || ""
 
     };
 
@@ -346,50 +405,237 @@ function getResourceTiming(target){
 }
 
 
-function resourceLines(rt){
+/* =========================================================
+   Resource Timing compact display
+   ========================================================= */
+
+function resourceSummary(rt){
 
   if(!rt){
 
-    return[
-      "【ブラウザ通信計測】",
-      "Resource Timing：記録なし"
+    return [
+      "RT：記録なし"
     ];
 
   }
 
-  return[
 
-    "【ブラウザ通信計測】",
+  return [
 
-    "Resource開始："+ms(rt.startTime)+" ms",
+    "RT fetch:" + ms(rt.fetchStart) +
+      " req:" + ms(rt.requestStart) +
+      " rsp:" + ms(rt.responseStart) +
+      " end:" + ms(rt.responseEnd),
 
-    "Resource duration："+ms(rt.duration)+" ms",
+    "RT DNS:" + ms(rt.domainLookupEnd - rt.domainLookupStart) +
+      " conn:" + ms(rt.connectEnd - rt.connectStart) +
+      " TLS:" + ms(
+        rt.secureConnectionStart > 0
+          ? rt.connectEnd - rt.secureConnectionStart
+          : 0
+      ),
 
-    "fetchStart："+ms(rt.fetchStart)+" ms",
-
-    "DNS開始："+ms(rt.domainLookupStart)+" ms",
-
-    "DNS終了："+ms(rt.domainLookupEnd)+" ms",
-
-    "接続開始："+ms(rt.connectStart)+" ms",
-
-    "接続終了："+ms(rt.connectEnd)+" ms",
-
-    "TLS開始："+ms(rt.secureConnectionStart)+" ms",
-
-    "HTTP request開始："+ms(rt.requestStart)+" ms",
-
-    "HTTP response開始："+ms(rt.responseStart)+" ms",
-
-    "HTTP response終了："+ms(rt.responseEnd)+" ms",
-
-    "転送サイズ："+ms(rt.transferSize)+" bytes",
-
-    "protocol："+(rt.nextHopProtocol||"取得不可"),
-
-    "initiator："+(rt.initiatorType||"取得不可")
+    "RT transfer:" +
+      ms(rt.transferSize) +
+      "B / " +
+      (rt.nextHopProtocol || "protocol不明")
 
   ];
+
+}
+
+
+/* =========================================================
+   Event Loop 遅延計測
+   ========================================================= */
+
+let eventLoopTimer = null;
+
+let eventLoopMaxDelay = 0;
+
+let eventLoopLast =
+  performance.now();
+
+
+function startEventLoopMonitor(){
+
+  eventLoopLast =
+    performance.now();
+
+
+  eventLoopTimer =
+    setInterval(()=>{
+
+      const now =
+        performance.now();
+
+
+      const expected =
+        eventLoopLast + 1000;
+
+
+      const delay =
+        Math.max(
+          0,
+          now - expected
+        );
+
+
+      if(delay > eventLoopMaxDelay){
+
+        eventLoopMaxDelay =
+          delay;
+
+      }
+
+
+      eventLoopLast =
+        now;
+
+    },1000);
+
+}
+
+
+function stopEventLoopMonitor(){
+
+  if(eventLoopTimer){
+
+    clearInterval(
+      eventLoopTimer
+    );
+
+    eventLoopTimer =
+      null;
+
+  }
+
+}
+
+
+/* =========================================================
+   response body詳細取得
+   ========================================================= */
+
+async function readResponseBody(response){
+
+  const bodyStart =
+    performance.now();
+
+
+  let firstChunk =
+    0;
+
+  let bodyEnd =
+    0;
+
+  let totalBytes =
+    0;
+
+  let chunkCount =
+    0;
+
+  let text =
+    "";
+
+
+  if(
+    response.body &&
+    response.body.getReader
+  ){
+
+    const reader =
+      response.body.getReader();
+
+
+    const decoder =
+      new TextDecoder();
+
+
+    while(true){
+
+      const result =
+        await reader.read();
+
+
+      if(result.done){
+
+        break;
+
+      }
+
+
+      if(!firstChunk){
+
+        firstChunk =
+          performance.now();
+
+      }
+
+
+      chunkCount++;
+
+
+      if(result.value){
+
+        totalBytes +=
+          result.value.byteLength;
+
+        text +=
+          decoder.decode(
+            result.value,
+            {
+              stream:true
+            }
+          );
+
+      }
+
+    }
+
+
+    text +=
+      decoder.decode();
+
+
+    bodyEnd =
+      performance.now();
+
+  }else{
+
+    text =
+      await response.text();
+
+
+    bodyEnd =
+      performance.now();
+
+    firstChunk =
+      bodyEnd;
+
+  }
+
+
+  return{
+
+    text,
+
+    firstChunkMs:
+      firstChunk
+        ? firstChunk - bodyStart
+        : 0,
+
+    bodyDurationMs:
+      bodyEnd - bodyStart,
+
+    bodyCompleteMs:
+      bodyEnd,
+
+    totalBytes,
+
+    chunkCount
+
+  };
 
 }
 
@@ -400,17 +646,27 @@ function resourceLines(rt){
 
 function send(){
 
-  const measureStart=
+
+  const measureStart =
     performance.now();
 
-  const sendStartMs=
+
+  const sendStartMs =
     Date.now();
 
-  const startTime=
-    new Date(sendStartMs).toISOString();
 
-  const browserState=
+  const startTime =
+    new Date(
+      sendStartMs
+    ).toISOString();
+
+
+  const browserStart =
     getBrowserState();
+
+
+  startEventLoopMonitor();
+
 
   console.log(
     "【SEND開始】",
@@ -419,11 +675,11 @@ function send(){
     selected,
     sendNumber,
     tagStage,
-    "requestId="+requestId
+    requestId
   );
 
 
-  msgDiv.innerText=
+  msgDiv.innerText =
     "📡 送信中…";
 
 
@@ -432,15 +688,19 @@ function send(){
      ======================================================= */
 
   if(
-    sessionStorage.getItem(sendKey)==="sending"
+    sessionStorage.getItem(sendKey) ===
+    "sending"
   ){
 
-    debugDiv.innerText=
+    stopEventLoopMonitor();
+
+    debugDiv.innerText =
       "二重送信防止";
 
     return;
 
   }
+
 
   sessionStorage.setItem(
     sendKey,
@@ -452,102 +712,108 @@ function send(){
      fetch開始
      ======================================================= */
 
-  const fetchStart=
+  const fetchStart =
     performance.now();
 
-  const fetchStartMs=
+
+  const fetchStartMs =
     Date.now();
 
 
-  const sendToFetchMs=
+  const sendToFetchMs =
     Math.max(
       0,
       Math.round(
-        fetchStartMs-sendStartMs
+        fetchStartMs -
+        sendStartMs
       )
     );
 
 
-  console.log(
-    "【SEND送信→fetch開始】",
-    sendToFetchMs+" ms"
-  );
-
-
-  const url=
-    `${GAS_URL}?player=${encodeURIComponent(player)}`+
-    `&selected=${encodeURIComponent(selected)}`+
-    `&number=${encodeURIComponent(sendNumber)}`+
-    `&tagStage=${encodeURIComponent(tagStage)}`+
-    `&clientSendMs=${encodeURIComponent(sendStartMs)}`+
-    `&requestId=${encodeURIComponent(requestId)}`+
+  const url =
+    `${GAS_URL}` +
+    `?player=${encodeURIComponent(player)}` +
+    `&selected=${encodeURIComponent(selected)}` +
+    `&number=${encodeURIComponent(sendNumber)}` +
+    `&tagStage=${encodeURIComponent(tagStage)}` +
+    `&clientSendMs=${encodeURIComponent(sendStartMs)}` +
+    `&requestId=${encodeURIComponent(requestId)}` +
     `&_=${Date.now()}`;
 
 
-  /* =======================================================
-     重要変更
-     
-     AbortControllerは作るが、
-     15秒タイマーではabortしない。
-     
-     15秒は「計測上の異常到達点」として記録するだけ。
-     ======================================================= */
-
-  const controller=
-    new AbortController();
+  /*
+   * ★重要
+   *
+   * AbortControllerは使用しない。
+   *
+   * 15秒は通信終了ではなく
+   * 「異常到達時点」の記録だけ。
+   */
 
 
-  let timeoutFired=false;
-
-  let responseReceived=false;
-
-  let jsonCompleted=false;
-
-  let answerIdReceived=false;
-
-  let actualAbort=false;
-
-  let timeoutId=null;
+  let timeoutFired =
+    false;
 
 
-  /* =======================================================
-     15秒到達
-     
-     ★ここでは絶対に controller.abort() しない
-     ======================================================= */
+  let timeoutCheckpoint =
+    null;
 
-  timeoutId=
+
+  const timeoutId =
     setTimeout(()=>{
 
-      timeoutFired=true;
+      timeoutFired =
+        true;
 
-      const timeoutNow=
+
+      const now =
+        performance.now();
+
+
+      const nowMs =
         Date.now();
 
-      const timeoutElapsed=
-        performance.now()-measureStart;
 
-      const fetchElapsed=
-        performance.now()-fetchStart;
+      const rt =
+        getResourceTiming(
+          GAS_URL
+        );
 
-      const rt=
-        getResourceTiming(GAS_URL);
 
-      const bs=
+      const bs =
         getBrowserState();
 
 
-      console.warn(
-        "【SEND 15秒到達・fetch継続】",
-        "send="+
-          Math.round(timeoutElapsed)+"ms",
-        "fetch="+
-          Math.round(fetchElapsed)+"ms",
-        "requestId="+requestId
-      );
+      timeoutCheckpoint = {
+
+        timeMs:
+          nowMs,
+
+        elapsedMs:
+          Math.round(
+            now - measureStart
+          ),
+
+        fetchElapsedMs:
+          Math.round(
+            now - fetchStart
+          ),
+
+        browserState:
+          bs,
+
+        resourceTiming:
+          rt,
+
+        eventLoopMaxDelay:
+          Math.round(
+            eventLoopMaxDelay
+          )
+
+      };
 
 
-      msgDiv.innerText=
+      msgDiv.innerText =
         "📩 15秒超過・応答待機中";
 
 
@@ -555,192 +821,127 @@ function send(){
 
         "【送信診断】15秒超過",
 
-        "送信開始 → 15秒到達："+
-          Math.round(timeoutElapsed)+" ms",
+        "送信→15秒："+
+          Math.round(
+            now - measureStart
+          )+" ms",
 
-        "fetch開始 → 15秒到達："+
-          Math.round(fetchElapsed)+" ms",
+        "fetch→15秒："+
+          Math.round(
+            now - fetchStart
+          )+" ms",
 
-        "★ fetchは中止していません",
+        "★ fetch継続中",
 
-        "HTTP応答を引き続き待機中",
+        "HTTP response：待機中",
 
-        "response受信："+String(responseReceived),
+        "15秒時online："+
+          String(bs.online),
 
-        "JSON解析完了："+String(jsonCompleted),
+        "15秒時画面："+
+          String(bs.visibility),
 
-        "answerId取得："+String(answerIdReceived),
+        "RT response："+
+          (
+            rt
+              ? ms(rt.responseStart)
+              : "なし"
+          )+" ms",
 
-        "実際のAbort："+String(actualAbort),
-
-        ...browserLines(bs),
-
-        ...resourceLines(rt)
+        "通信計測を継続しています"
 
       ]);
 
-
-      const diagnostic={
-
-        result:"TIMEOUT_WAITING",
-
-        time:startTime,
-
-        sendStartMs,
-
-        fetchStartMs,
-
-        requestId,
-
-        timeoutMs:timeoutNow,
-
-        elapsedMs:
-          Math.round(timeoutElapsed),
-
-        fetchElapsedMs:
-          Math.round(fetchElapsed),
-
-        timeoutFired:true,
-
-        responseReceived,
-
-        jsonCompleted,
-
-        answerIdReceived,
-
-        actualAbort:false,
-
-        player,
-
-        selected,
-
-        number:sendNumber,
-
-        tagStage,
-
-        browserState:bs,
-
-        resourceTiming:rt,
-
-        timeoutUrl:url
-
-      };
-
-
-      saveLastDiagnostic(
-        diagnostic
-      );
-
-      saveSendRecord(
-        diagnostic
-      );
-
-
-      /*
-         ★ここが今回の重要ポイント
-
-         15秒後もfetchを生かす。
-      */
 
     },15000);
 
 
   /* =======================================================
-     fetch本体
+     fetch
      ======================================================= */
 
   fetch(
     url,
     {
       method:"GET",
-      cache:"no-store",
-      signal:controller.signal
+      cache:"no-store"
     }
   )
 
 
   /* =======================================================
-     HTTP response受信
+     HTTP responseヘッダ受信
      ======================================================= */
 
-  .then(response=>{
+  .then(async response=>{
 
-    responseReceived=true;
 
-    const responseMs=
+    const responseMs =
       Date.now();
 
-    const responseElapsed=
-      performance.now()-measureStart;
 
-    const fetchElapsed=
-      performance.now()-fetchStart;
+    const responseTime =
+      performance.now();
 
 
-    window.__sendResponseMs=
+    const responseElapsed =
+      responseTime -
+      measureStart;
+
+
+    const fetchToResponseMs =
+      responseTime -
+      fetchStart;
+
+
+    window.__sendResponseMs =
       responseMs;
 
-    window.__sendResponseElapsed=
+
+    window.__sendResponseElapsed =
       responseElapsed;
 
-    window.__sendResponseStatus=
+
+    window.__sendResponseStatus =
       response.status;
 
 
-    console.log(
-      "【SEND HTTP応答受信】",
-      "status="+response.status,
-      "response="+
-        Math.round(responseElapsed)+"ms",
-      "fetch="+
-        Math.round(fetchElapsed)+"ms",
-      "15秒超過="+
-        String(timeoutFired)
-    );
+    window.__responseHeadersReceived =
+      true;
 
-
-    if(timeoutId){
-
-      clearTimeout(timeoutId);
-
-      timeoutId=null;
-
-    }
-
-
-    const rt=
-      getResourceTiming(GAS_URL);
-
-    const bs=
-      getBrowserState();
-
-
-    /*
-       15秒後に返ってきた場合は、
-       ここで「HTTP応答が実際に届いた」と確定。
-    */
 
     if(timeoutFired){
+
+      /*
+       * ★15秒後にここへ来た場合
+       * ここで画面を必ず更新する。
+       */
+
+      msgDiv.innerText =
+        "📩 HTTP応答受信";
+
 
       showDiagnostic([
 
         "【送信診断】15秒後HTTP応答",
 
-        "送信開始 → HTTP応答："+
-          Math.round(responseElapsed)+" ms",
+        "送信→HTTP応答："+
+          Math.round(
+            responseElapsed
+          )+" ms",
 
-        "fetch開始 → HTTP応答："+
-          Math.round(fetchElapsed)+" ms",
-
-        "15秒到達後にHTTP応答を受信",
+        "fetch→HTTP応答："+
+          Math.round(
+            fetchToResponseMs
+          )+" ms",
 
         "HTTP status："+response.status,
 
-        "JSON解析待ち",
+        "★15秒後に応答を受信",
 
-        ...browserLines(bs),
+        "HTTP body受信を計測中…",
 
-        ...resourceLines(rt)
+        "実際のAbort：false"
 
       ]);
 
@@ -756,166 +957,374 @@ function send(){
     }
 
 
-    return response.json();
+    /*
+     * bodyを細分化して計測
+     */
+
+    const bodyInfo =
+      await readResponseBody(
+        response
+      );
+
+
+    window.__bodyInfo =
+      bodyInfo;
+
+
+    const bodyCompleteTime =
+      performance.now();
+
+
+    /*
+     * ★body全部受信した時点
+     */
+
+    if(timeoutFired){
+
+      msgDiv.innerText =
+        "📩 HTTP受信完了・解析中";
+
+
+      showDiagnostic([
+
+        "【送信診断】15秒後HTTP受信完了",
+
+        "送信→HTTP応答："+
+          Math.round(
+            responseElapsed
+          )+" ms",
+
+        "HTTP応答→body完了："+
+          Math.round(
+            bodyCompleteTime -
+            responseTime
+          )+" ms",
+
+        "body受信時間："+
+          Math.round(
+            bodyInfo.bodyDurationMs
+          )+" ms",
+
+        "最初のbody："+ 
+          Math.round(
+            bodyInfo.firstChunkMs
+          )+" ms",
+
+        "bodyサイズ："+ 
+          bodyInfo.totalBytes+" bytes",
+
+        "chunk数："+ 
+          bodyInfo.chunkCount,
+
+        "JSON解析中…"
+
+      ]);
+
+    }
+
+
+    return{
+
+      response,
+
+      bodyText:
+        bodyInfo.text,
+
+      bodyInfo,
+
+      responseTime,
+
+      bodyCompleteTime
+
+    };
 
   })
 
 
   /* =======================================================
-     JSON解析完了
+     JSON解析
      ======================================================= */
 
-  .then(data=>{
-
-    jsonCompleted=true;
+  .then(packet=>{
 
 
-    const jsonEnd=
+    const jsonStart =
       performance.now();
 
-    const jsonEndMs=
-      Date.now();
 
-    const fetchTime=
-      jsonEnd-fetchStart;
+    let data;
 
 
-    const responseElapsed=
-      window.__sendResponseElapsed||0;
+    try{
+
+      data =
+        JSON.parse(
+          packet.bodyText
+        );
+
+    }catch(error){
+
+      error.phase =
+        "JSON.parse";
 
 
-    const gasReceiveMs=
-      Number(data.gasReceiveMs)||0;
-
-    const gasCompleteMs=
-      Number(data.gasCompleteMs)||0;
+      error.responseReceived =
+        true;
 
 
-    const answerId=
-      String(
-        data.answerId||""
-      ).trim();
+      error.bodyReceived =
+        true;
 
 
-    if(answerId){
+      error.bodyTextLength =
+        packet.bodyText.length;
 
-      answerIdReceived=true;
+
+      throw error;
 
     }
 
 
-    const gasInternalMs=
+    const jsonEnd =
+      performance.now();
+
+
+    const jsonParseMs =
+      jsonEnd -
+      jsonStart;
+
+
+    window.__jsonParseMs =
+      jsonParseMs;
+
+
+    const answerId =
+      String(
+        data.answerId || ""
+      ).trim();
+
+
+    if(timeoutFired){
+
+      msgDiv.innerText =
+        "📩 JSON解析完了";
+
+
+      showDiagnostic([
+
+        "【送信診断】15秒後JSON解析完了",
+
+        "送信→HTTP応答："+ 
+          Math.round(
+            packet.responseTime -
+            measureStart
+          )+" ms",
+
+        "HTTP→body完了："+ 
+          Math.round(
+            packet.bodyCompleteTime -
+            packet.responseTime
+          )+" ms",
+
+        "body→JSON："+ 
+          Math.round(
+            jsonParseMs
+          )+" ms",
+
+        "answerId："+ 
+          (
+            answerId
+              ? "取得済み"
+              : "取得できず"
+          ),
+
+        "最終結果を表示します"
+
+      ]);
+
+    }
+
+
+    return{
+
+      data,
+
+      answerId,
+
+      response:
+        packet.response,
+
+      bodyInfo:
+        packet.bodyInfo,
+
+      responseTime:
+        packet.responseTime,
+
+      bodyCompleteTime:
+        packet.bodyCompleteTime,
+
+      jsonEnd,
+
+      jsonParseMs
+
+    };
+
+  })
+
+
+  /* =======================================================
+     最終処理
+     ======================================================= */
+
+  .then(packet=>{
+
+
+    const data =
+      packet.data;
+
+
+    const answerId =
+      packet.answerId;
+
+
+    const finalMs =
+      performance.now();
+
+
+    const finalWallMs =
+      Date.now();
+
+
+    const fetchTime =
+      finalMs -
+      fetchStart;
+
+
+    const responseElapsed =
+      window.__sendResponseElapsed ||
+      0;
+
+
+    const gasReceiveMs =
+      Number(
+        data.gasReceiveMs
+      ) || 0;
+
+
+    const gasCompleteMs =
+      Number(
+        data.gasCompleteMs
+      ) || 0;
+
+
+    const gasInternalMs =
       (
         gasReceiveMs &&
         gasCompleteMs
       )
-      ?gasCompleteMs-gasReceiveMs
-      :0;
+        ? gasCompleteMs -
+          gasReceiveMs
+        : 0;
 
 
-    /* =====================================================
-       fetch開始 → GAS受信
-       ===================================================== */
-
-    const fetchToGasReceiveMs=
-      gasReceiveMs&&fetchStartMs
-        ?Math.max(
-            0,
-            Math.round(
-              gasReceiveMs-fetchStartMs
-            )
-          )
-        :0;
-
-
-    /* =====================================================
-       送信開始 → GAS受信
-       ===================================================== */
-
-    const sendToGasReceiveMs=
+    const fetchToGasReceiveMs =
       gasReceiveMs
-        ?Math.max(
+        ? Math.max(
             0,
             Math.round(
-              gasReceiveMs-sendStartMs
+              gasReceiveMs -
+              fetchStartMs
             )
           )
-        :0;
+        : 0;
 
 
-    /* =====================================================
-       GAS処理完了 → HTTP応答
-       ===================================================== */
+    const sendToGasReceiveMs =
+      gasReceiveMs
+        ? Math.max(
+            0,
+            Math.round(
+              gasReceiveMs -
+              sendStartMs
+            )
+          )
+        : 0;
 
-    const gasCompleteToResponseMs=
+
+    const gasCompleteToResponseMs =
       gasCompleteMs &&
       window.__sendResponseMs
-        ?Math.round(
-            window.__sendResponseMs-
+        ? Math.round(
+            window.__sendResponseMs -
             gasCompleteMs
           )
-        :0;
+        : 0;
 
 
-    const gasOutsideMs=
+    const responseToBodyMs =
+      Math.round(
+        packet.bodyCompleteTime -
+        packet.responseTime
+      );
+
+
+    const bodyToJsonMs =
+      Math.round(
+        packet.jsonEnd -
+        packet.bodyCompleteTime
+      );
+
+
+    const jsonToAnswerMs =
+      Math.round(
+        finalMs -
+        packet.jsonEnd
+      );
+
+
+    const gasOutsideMs =
       Math.max(
         0,
         Math.round(
-          fetchTime-gasInternalMs
+          fetchTime -
+          gasInternalMs
         )
       );
 
 
-    const sentDisplayMs=
-      Date.now();
-
-    const sendDisplayTime=
-      performance.now()-measureStart;
+    const sentDisplayMs =
+      finalWallMs;
 
 
-    const jsonParseMs=
-      Math.max(
-        0,
-        Math.round(
-          jsonEnd-
-          (
-            measureStart+
-            responseElapsed
-          )
-        )
+    const sendDisplayTime =
+      finalMs -
+      measureStart;
+
+
+    const rt =
+      getResourceTiming(
+        GAS_URL
       );
 
 
-    const rt=
-      getResourceTiming(GAS_URL);
-
-    const bs=
+    const browserFinal =
       getBrowserState();
 
-    const status=
+
+    const status =
       window.__sendResponseStatus;
 
 
-    /* =====================================================
-       15秒超過後に返ってきた場合
-       ===================================================== */
+    const bodyInfo =
+      packet.bodyInfo;
 
-    if(timeoutFired){
 
-      console.warn(
-        "【SEND 15秒後の応答完了】",
+    stopEventLoopMonitor();
 
-        "fetch="+
-          Math.round(fetchTime)+"ms",
 
-        "json="+
-          Math.round(jsonEndMs-sendStartMs)+"ms",
-
-        "answerId="+
-          answerId
-      );
-
-    }
+    clearTimeout(
+      timeoutId
+    );
 
 
     sessionStorage.setItem(
@@ -924,107 +1333,73 @@ function send(){
     );
 
 
-    msgDiv.innerText=
+    /*
+     * ★最終画面
+     *
+     * 15秒後に来ても必ずここへ更新
+     */
+
+    msgDiv.innerText =
       "📩 送信しました！";
 
 
     showDiagnostic([
 
       timeoutFired
-        ?"【今回の送信診断】15秒超過後に完了"
-        :"【今回の送信診断】正常",
-
-      "requestId："+requestId,
+        ? "【今回の送信診断】15秒超過後に完了"
+        : "【今回の送信診断】正常",
 
       "answerId："+answerId,
 
-      "送信開始 → fetch開始："+
-        sendToFetchMs+" ms",
+      "送信→fetch："+sendToFetchMs+" ms",
 
-      "fetch開始 → GAS受信："+
-        fetchToGasReceiveMs+" ms",
+      "fetch→GAS受信："+fetchToGasReceiveMs+" ms",
 
-      "fetch開始 → HTTP応答："+
-        Math.round(
-          responseElapsed
-        )+" ms",
+      "GAS受信→処理完了："+Math.round(gasInternalMs)+" ms",
 
-      "HTTP応答 → JSON解析完了："+
-        jsonParseMs+" ms",
+      "GAS完了→HTTP応答："+gasCompleteToResponseMs+" ms",
 
-      "送信開始 → JSON解析完了："+
-        Math.round(
-          jsonEndMs-sendStartMs
-        )+" ms",
+      "HTTP応答→body完了："+responseToBodyMs+" ms",
 
-      "送信開始 → GAS受信（目安）："+
-        sendToGasReceiveMs+" ms",
+      "body完了→JSON："+bodyToJsonMs+" ms",
 
-      "GAS受信 → GAS処理完了："+
-        Math.round(
-          gasInternalMs
-        )+" ms",
+      "JSON→answerId："+jsonToAnswerMs+" ms",
 
-      "GAS処理完了 → HTTP応答（目安）："+
-        gasCompleteToResponseMs+" ms",
+      "fetch→answerId："+Math.round(fetchTime)+" ms",
 
-      "GAS外の時間："+
-        gasOutsideMs+" ms",
-
-      "送信開始 →「送信しました」："+
-        Math.round(
-          sendDisplayTime
-        )+" ms",
-
-      "15秒超過："+String(timeoutFired),
+      "送信→送信しました："+Math.round(sendDisplayTime)+" ms",
 
       "HTTP："+status,
 
-      "JSON解析完了："+String(jsonCompleted),
+      "body："+bodyInfo.totalBytes+" B / "+bodyInfo.chunkCount+" chunk",
 
-      "answerId取得："+String(answerIdReceived),
+      "15秒超過："+String(timeoutFired),
 
-      "実際のAbort："+String(actualAbort),
+      "eventLoop最大遅延："+Math.round(eventLoopMaxDelay)+" ms",
 
-      ...browserLines(bs),
+      "online："+String(browserFinal.online)+
+        " / 画面："+String(browserFinal.visibility),
 
-      ...resourceLines(rt)
+      ...resourceSummary(rt)
 
     ]);
 
 
-    /* =====================================================
-       診断データ保存
-       ===================================================== */
+    /*
+     * ★最終診断データ
+     */
 
-    const diagnostic={
+    const diagnostic = {
 
       result:
         timeoutFired
-          ?"GAS_RESPONSE_AFTER_15S"
-          :"GAS_RESPONSE",
+          ? "GAS_RESPONSE_AFTER_15S"
+          : "GAS_RESPONSE",
 
-      time:startTime,
-
-      sendStartMs,
-
-      fetchStartMs,
+      time:
+        startTime,
 
       requestId,
-
-      responseMs:
-        window.__sendResponseMs||0,
-
-      responseElapsedMs:
-        Math.round(
-          responseElapsed
-        ),
-
-      jsonEndMs,
-
-      sentDisplayMs,
-
-      answerId,
 
       player,
 
@@ -1032,12 +1407,40 @@ function send(){
 
       dog,
 
-      number:sendNumber,
+      number:
+        sendNumber,
 
       tagStage,
 
-      fetchMs:
-        Math.round(fetchTime),
+
+      sendStartMs,
+
+      fetchStartMs,
+
+      responseMs:
+        window.__sendResponseMs || 0,
+
+      bodyCompleteMs:
+        finalWallMs -
+        Math.max(
+          0,
+          Math.round(
+            finalMs -
+            packet.bodyCompleteTime
+          )
+        ),
+
+      jsonEndMs:
+        finalWallMs -
+        Math.max(
+          0,
+          Math.round(
+            finalMs -
+            packet.jsonEnd
+          )
+        ),
+
+      answerId,
 
       sendToFetchMs,
 
@@ -1046,30 +1449,77 @@ function send(){
       sendToGasReceiveMs,
 
       gasInternalMs:
-        Math.round(gasInternalMs),
+        Math.round(
+          gasInternalMs
+        ),
 
       gasCompleteToResponseMs,
 
-      gasOutsideMs,
+      responseToBodyMs,
+
+      bodyToJsonMs,
+
+      jsonToAnswerMs,
+
+      fetchMs:
+        Math.round(
+          fetchTime
+        ),
 
       sendToDisplayMs:
-        Math.round(sendDisplayTime),
+        Math.round(
+          sendDisplayTime
+        ),
 
-      httpStatus:status,
+      gasOutsideMs,
 
-      jsonParseMs,
+      httpStatus:
+        status,
+
+      bodyBytes:
+        bodyInfo.totalBytes,
+
+      bodyChunks:
+        bodyInfo.chunkCount,
+
+      bodyFirstChunkMs:
+        Math.round(
+          bodyInfo.firstChunkMs
+        ),
+
+      bodyDurationMs:
+        Math.round(
+          bodyInfo.bodyDurationMs
+        ),
+
+      jsonParseMs:
+        Math.round(
+          packet.jsonParseMs
+        ),
 
       timeoutFired,
 
-      responseReceived,
+      timeoutCheckpoint,
 
-      jsonCompleted,
+      responseHeadersReceived:true,
 
-      answerIdReceived,
+      bodyReceived:true,
 
-      actualAbort,
+      jsonCompleted:true,
 
-      browserState:bs,
+      answerIdReceived:
+        !!answerId,
+
+      actualAbort:false,
+
+      eventLoopMaxDelay:
+        Math.round(
+          eventLoopMaxDelay
+        ),
+
+      browserStart,
+
+      browserFinal,
 
       resourceTiming:rt
 
@@ -1080,21 +1530,23 @@ function send(){
       diagnostic
     );
 
+
     saveSendRecord(
       diagnostic
     );
 
 
-    /* =====================================================
-       「送信しました」時刻をGASへ保存
-       ===================================================== */
+    /*
+     * 「送信しました」表示時刻をGASへ保存
+     */
 
     if(answerId){
 
-      const displayUrl=
-        `${GAS_URL}?event=sentDisplay`+
-        `&answerId=${encodeURIComponent(answerId)}`+
-        `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}`+
+      const displayUrl =
+        `${GAS_URL}` +
+        `?event=sentDisplay` +
+        `&answerId=${encodeURIComponent(answerId)}` +
+        `&sentDisplayMs=${encodeURIComponent(sentDisplayMs)}` +
         `&_=${Date.now()}`;
 
 
@@ -1109,7 +1561,7 @@ function send(){
 
         console.log(
           "【SEND sentDisplay送信完了】",
-          "answerId="+answerId
+          answerId
         );
 
       })
@@ -1126,12 +1578,13 @@ function send(){
 
 
     /*
-       送信完了後は15秒でplayerへ戻る
-    */
+     * 診断画面を15秒表示
+     */
 
     setTimeout(
       ()=>{
-        location.href="player.html";
+        location.href =
+          "player.html";
       },
       15000
     );
@@ -1143,34 +1596,34 @@ function send(){
      通信エラー
      ======================================================= */
 
-  .catch(async error=>{
-
-    if(timeoutId){
-
-      clearTimeout(timeoutId);
-
-      timeoutId=null;
-
-    }
+  .catch(error=>{
 
 
-    const errorTime=
-      performance.now()-measureStart;
+    stopEventLoopMonitor();
 
-    const errorMs=
+
+    clearTimeout(
+      timeoutId
+    );
+
+
+    const errorTime =
+      performance.now() -
+      measureStart;
+
+
+    const errorMs =
       Date.now();
 
 
-    const isAbort=
-      error &&
-      error.name==="AbortError";
+    const rt =
+      getResourceTiming(
+        GAS_URL
+      );
 
 
-    if(isAbort){
-
-      actualAbort=true;
-
-    }
+    const bs =
+      getBrowserState();
 
 
     sessionStorage.setItem(
@@ -1179,66 +1632,46 @@ function send(){
     );
 
 
-    const rt=
-      getResourceTiming(GAS_URL);
-
-    const bs=
-      getBrowserState();
-
-
     console.error(
       "【SEND通信ERROR】",
-      "時間="+
-        Math.round(errorTime)+"ms",
-      "error="+
-        String(error),
-      "name="+
-        (
-          error&&error.name
-            ?error.name
-            :""
-        ),
-      "timeoutFired="+
-        String(timeoutFired)
+      error
     );
 
 
-    msgDiv.innerText=
-      "📩 送信確認中";
+    msgDiv.innerText =
+      "📩 通信確認中";
 
 
     showDiagnostic([
 
-      isAbort
-        ?"【送信診断】実際のAbort"
-        :"【送信診断】通信ERROR",
+      timeoutFired
+        ? "【送信診断】15秒超過後ERROR"
+        : "【送信診断】通信ERROR",
 
-      "requestId："+requestId,
-
-      "送信開始 → ERROR："+
-        Math.round(errorTime)+" ms",
+      "送信→ERROR："+Math.round(errorTime)+" ms",
 
       "15秒超過："+String(timeoutFired),
 
-      "response受信："+String(responseReceived),
-
-      "JSON解析完了："+String(jsonCompleted),
-
-      "answerId取得："+String(answerIdReceived),
-
-      "実際のAbort："+String(actualAbort),
+      "HTTP response："+String(
+        window.__sendResponseReceived || false
+      ),
 
       "error："+String(error),
 
       "error.name："+(
-        error&&error.name
-          ?error.name
-          :"取得不可"
+        error &&
+        error.name
+          ? error.name
+          : "取得不可"
       ),
 
-      ...browserLines(bs),
+      "eventLoop最大遅延："+Math.round(eventLoopMaxDelay)+" ms",
 
-      ...resourceLines(rt)
+      "online："+String(bs.online),
+
+      "画面："+String(bs.visibility),
+
+      ...resourceSummary(rt)
 
     ]);
 
@@ -1246,110 +1679,67 @@ function send(){
     saveLastDiagnostic({
 
       result:
-        isAbort
-          ?"ABORT"
-          :"ERROR",
+        "ERROR",
 
-      time:startTime,
+      time:
+        startTime,
+
+      requestId,
 
       sendStartMs,
 
       fetchStartMs,
-
-      requestId,
 
       errorMs,
 
       elapsedMs:
-        Math.round(errorTime),
+        Math.round(
+          errorTime
+        ),
 
       errorMessage:
         String(error),
 
       errorName:
-        error&&error.name
-          ?error.name
-          :"",
+        error &&
+        error.name
+          ? error.name
+          : "",
 
       timeoutFired,
 
-      responseReceived,
+      timeoutCheckpoint,
 
-      jsonCompleted,
+      responseHeadersReceived:
+        !!window.__responseHeadersReceived,
 
-      answerIdReceived,
+      browserState:
+        bs,
 
-      actualAbort,
+      resourceTiming:
+        rt,
+
+      eventLoopMaxDelay:
+        Math.round(
+          eventLoopMaxDelay
+        ),
 
       player,
 
       selected,
 
-      number:sendNumber,
+      number:
+        sendNumber,
 
-      tagStage,
-
-      browserState:bs,
-
-      resourceTiming:rt
-
-    });
-
-
-    saveSendRecord({
-
-      time:startTime,
-
-      sendStartMs,
-
-      fetchStartMs,
-
-      requestId,
-
-      errorTimeMs:errorMs,
-
-      player,
-
-      selected,
-
-      dog,
-
-      number:sendNumber,
-
-      tagStage,
-
-      sendToError:
-        Math.round(errorTime),
-
-      errorMessage:
-        String(error),
-
-      errorName:
-        error&&error.name
-          ?error.name
-          :"",
-
-      timeoutFired,
-
-      responseReceived,
-
-      jsonCompleted,
-
-      answerIdReceived,
-
-      actualAbort,
-
-      result:
-        isAbort
-          ?"ABORT"
-          :"ERROR"
+      tagStage
 
     });
 
 
     setTimeout(
       ()=>{
-        location.href="player.html";
+        location.href =
+          "player.html";
       },
       15000
     );
@@ -1362,5 +1752,6 @@ function send(){
 send();
 
 </script>
+
 </body>
 </html>

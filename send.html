@@ -9,18 +9,18 @@
 body{
   font-family:sans-serif;
   text-align:center;
-  padding-top:25px;
+  padding-top:30px;
   margin:0;
 }
 
 #msg{
-  font-size:36px;
+  font-size:42px;
   font-weight:bold;
-  margin:0 0 20px;
+  margin:0 0 18px;
 }
 
 #debug{
-  font-size:18px;
+  font-size:20px;
   line-height:1.35;
   white-space:pre-line;
   text-align:left;
@@ -41,53 +41,89 @@ body{
 const GAS_URL =
 "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
-const msg = document.getElementById("msg");
-const debug = document.getElementById("debug");
+const msgDiv =
+document.getElementById("msg");
 
-const pageStartMs = Date.now();
+const debugDiv =
+document.getElementById("debug");
+
+
+/* =========================================================
+   基本情報
+   ========================================================= */
 
 const player =
-localStorage.getItem("player");
+localStorage.getItem("player") || "";
 
-const selected =
-localStorage.getItem("selectedNumber");
+const storedSelected =
+localStorage.getItem("selectedNumber") || "";
+
 
 const params =
 new URLSearchParams(location.search);
 
-const dog =
-params.get("dog");
+const urlNumber =
+params.get("number") || "";
 
-const number =
-params.get("number");
+const dog =
+params.get("dog") || "";
 
 const tagStage =
-params.get("stage");
+params.get("stage") || "";
+
+
+/* =========================================================
+   ★今回の重要変更
+   送信番号を1つに確定する
+   =========================================================
+
+   URLのnumberが存在する場合は、
+   それを今回の送信番号として使用。
+
+   localStorageの古いselectedNumberを
+   別の番号として送らない。
+*/
 
 const sendNumber =
-number || dog;
+urlNumber || dog || storedSelected;
 
 
 /*
-=========================================================
-二重送信防止
-=========================================================
+   GASには
+   selected と number の両方が必要。
+
+   今回の送信対象番号を
+   両方に統一する。
 */
+
+const selectedForSend =
+sendNumber;
+
+
+/* =========================================================
+   二重送信防止
+   ========================================================= */
 
 const sendKey =
 "sending_" +
-String(player || "") + "_" +
-String(selected || "") + "_" +
-String(sendNumber || "") + "_" +
-String(tagStage || "");
+String(player) +
+"_" +
+String(sendNumber) +
+"_" +
+String(tagStage);
 
 
 if(
-  sessionStorage.getItem(sendKey) === "sending" ||
-  sessionStorage.getItem(sendKey) === "sent"
+  sessionStorage.getItem(sendKey) ===
+  "sending"
 ){
-  msg.innerText = "📩 送信しました！";
-  debug.innerText = "二重送信防止";
+
+  msgDiv.innerText =
+    "📩 送信しました！";
+
+  debugDiv.innerText =
+    "二重送信防止";
+
 }else{
 
   sessionStorage.setItem(
@@ -95,32 +131,34 @@ if(
     "sending"
   );
 
-  startSend();
+  send();
 
 }
 
 
-/*
-=========================================================
-診断保存
-=========================================================
-*/
+/* =========================================================
+   診断保存
+   ========================================================= */
 
-function saveHistory(data){
+function saveSendRecord(record){
 
   try{
 
-    const key = "NFC_SEND_HISTORY";
+    const key =
+      "NFC_SEND_HISTORY";
 
     let history =
       JSON.parse(
         localStorage.getItem(key) || "[]"
       );
 
-    history.push(data);
+    history.push(record);
 
     if(history.length > 100){
-      history = history.slice(-100);
+
+      history =
+        history.slice(-100);
+
     }
 
     localStorage.setItem(
@@ -130,8 +168,8 @@ function saveHistory(data){
 
   }catch(e){
 
-    console.log(
-      "history save error",
+    console.error(
+      "診断保存ERROR",
       e
     );
 
@@ -140,41 +178,46 @@ function saveHistory(data){
 }
 
 
-/*
-=========================================================
-「送信しました」時刻をGASへ通知
-=========================================================
-*/
+/* =========================================================
+   送信しました時刻をGASへ通知
+   ========================================================= */
 
 function sendSentDisplay(
   answerId,
-  sendStartMs,
   sentDisplayMs
 ){
+
+  if(!answerId){
+
+    return;
+
+  }
+
 
   const url =
     GAS_URL +
     "?event=sentDisplay" +
     "&answerId=" +
-    encodeURIComponent(answerId || "") +
-    "&clientSendMs=" +
-    encodeURIComponent(sendStartMs) +
+    encodeURIComponent(answerId) +
     "&sentDisplayMs=" +
     encodeURIComponent(sentDisplayMs) +
     "&player=" +
-    encodeURIComponent(player || "") +
+    encodeURIComponent(player) +
     "&number=" +
-    encodeURIComponent(sendNumber || "") +
+    encodeURIComponent(sendNumber) +
     "&stage=" +
-    encodeURIComponent(tagStage || "") +
+    encodeURIComponent(tagStage) +
     "&_=" +
     Date.now();
 
 
   /*
-    これは診断用。
-    「送信しました」の画面表示を
-    この通信の完了待ちにはしない。
+     ★重要
+
+     「送信しました」の表示後に
+     この通信を待たない。
+
+     ゲーム本線とは完全に分離。
   */
 
   fetch(
@@ -184,26 +227,51 @@ function sendSentDisplay(
       cache:"no-store",
       keepalive:true
     }
-  ).catch(
-    () => {}
+  )
+  .then(
+    response => {
+
+      console.log(
+        "【SEND sentDisplay成功】",
+        response.status
+      );
+
+    }
+  )
+  .catch(
+    error => {
+
+      console.error(
+        "【SEND sentDisplay失敗】",
+        error
+      );
+
+    }
   );
 
 }
 
 
-/*
-=========================================================
-送信本線
-=========================================================
-*/
+/* =========================================================
+   メイン送信
+   ========================================================= */
 
-function startSend(){
+function send(){
+
+  const sendStartPerf =
+    performance.now();
 
   const sendStartMs =
     Date.now();
 
-  const sendStartPerf =
-    performance.now();
+
+  msgDiv.innerText =
+    "📡 送信中…";
+
+
+  /*
+     fetch開始
+  */
 
   const fetchStartPerf =
     performance.now();
@@ -212,21 +280,66 @@ function startSend(){
     Date.now();
 
 
+  const sendToFetchMs =
+    fetchStartMs -
+    sendStartMs;
+
+
+  console.log(
+    "【SEND開始】",
+    "player=" + player,
+    "storedSelected=" + storedSelected,
+    "urlNumber=" + urlNumber,
+    "sendNumber=" + sendNumber,
+    "stage=" + tagStage
+  );
+
+
+  /*
+     ★送信番号の診断
+
+     localStorageとURLが違っていた場合も
+     記録する。
+  */
+
+  const numberMismatch =
+    storedSelected &&
+    urlNumber &&
+    String(storedSelected) !==
+    String(urlNumber);
+
+
+  if(numberMismatch){
+
+    console.warn(
+      "【番号不一致検知】",
+      "localStorage=" + storedSelected,
+      "URL=" + urlNumber,
+      "送信=" + sendNumber
+    );
+
+  }
+
+
   const url =
     GAS_URL +
     "?player=" +
-    encodeURIComponent(player || "") +
+    encodeURIComponent(player) +
     "&selected=" +
-    encodeURIComponent(selected || "") +
+    encodeURIComponent(selectedForSend) +
     "&number=" +
-    encodeURIComponent(sendNumber || "") +
+    encodeURIComponent(sendNumber) +
     "&tagStage=" +
-    encodeURIComponent(tagStage || "") +
+    encodeURIComponent(tagStage) +
     "&clientSendMs=" +
     encodeURIComponent(sendStartMs) +
     "&_=" +
     Date.now();
 
+
+  /*
+     ★15秒Abortは使用しない
+  */
 
   fetch(
     url,
@@ -242,20 +355,38 @@ function startSend(){
       const responseMs =
         Date.now();
 
+      const responsePerf =
+        performance.now();
+
+
+      window.__responseMs =
+        responseMs;
+
+      window.__responseStatus =
+        response.status;
+
+
       if(!response.ok){
 
         throw new Error(
-          "HTTP " + response.status
+          "HTTP " +
+          response.status
         );
 
       }
 
+
       return response.json()
         .then(
-          data => ({
-            data:data,
-            responseMs:responseMs
-          })
+          data => {
+
+            return {
+              data:data,
+              responseMs:responseMs,
+              responsePerf:responsePerf
+            };
+
+          }
         );
 
     }
@@ -267,60 +398,170 @@ function startSend(){
       const data =
         result.data;
 
+
       const responseMs =
         result.responseMs;
 
-      const sentDisplayMs =
+
+      const jsonEndMs =
         Date.now();
 
-      const elapsedMs =
-        sentDisplayMs -
-        sendStartMs;
+      const jsonEndPerf =
+        performance.now();
+
 
       const answerId =
         String(
           data.answerId || ""
-        );
+        ).trim();
+
+
+      const sendToResponseMs =
+        responseMs -
+        sendStartMs;
+
+
+      const sendToJsonMs =
+        jsonEndMs -
+        sendStartMs;
+
+
+      const fetchMs =
+        jsonEndPerf -
+        fetchStartPerf;
+
+
+      const gasReceiveMs =
+        Number(
+          data.gasReceiveMs
+        ) || 0;
+
+
+      const gasCompleteMs =
+        Number(
+          data.gasCompleteMs
+        ) || 0;
+
+
+      const gasInternalMs =
+        (
+          gasReceiveMs &&
+          gasCompleteMs
+        )
+        ?
+        gasCompleteMs -
+        gasReceiveMs
+        :
+        0;
+
+
+      const fetchToGasReceiveMs =
+        gasReceiveMs
+        ?
+        gasReceiveMs -
+        fetchStartMs
+        :
+        0;
+
+
+      const sendToGasReceiveMs =
+        gasReceiveMs
+        ?
+        gasReceiveMs -
+        sendStartMs
+        :
+        0;
+
+
+      const gasCompleteToResponseMs =
+        gasCompleteMs
+        ?
+        responseMs -
+        gasCompleteMs
+        :
+        0;
 
 
       /*
-      ================================================
-      ★ここで即表示
-      ================================================
+      =====================================================
+      ★送信しました表示
+      =====================================================
       */
+
+      const sentDisplayMs =
+        Date.now();
+
+
+      const sendToSentMs =
+        sentDisplayMs -
+        sendStartMs;
+
 
       sessionStorage.setItem(
         sendKey,
         "sent"
       );
 
-      msg.innerText =
+
+      /*
+         ★先に画面表示
+      */
+
+      msgDiv.innerText =
         "📩 送信しました！";
 
 
       /*
-      ================================================
-      ★送信→送信しました を記録
-      ================================================
+         ★送信→送信しました
+           を即時に画面表示
+      */
+
+      debugDiv.innerText =
+        "送信開始 → 送信しました：" +
+        sendToSentMs +
+        " ms\n\n" +
+
+        "送信開始 → HTTP応答：" +
+        sendToResponseMs +
+        " ms\n\n" +
+
+        "fetch開始 → GAS受信：" +
+        fetchToGasReceiveMs +
+        " ms\n\n" +
+
+        "GAS受信 → GAS処理完了：" +
+        gasInternalMs +
+        " ms\n\n" +
+
+        "番号：" +
+        sendNumber;
+
+
+      /*
+      =====================================================
+      ★timing_log用
+      =====================================================
       */
 
       sendSentDisplay(
         answerId,
-        sendStartMs,
         sentDisplayMs
       );
 
 
       /*
-      ローカルにも必ず残す
+      =====================================================
+      ローカル診断
+      =====================================================
       */
 
-      saveHistory({
+      saveSendRecord({
 
-        result:"GAS_RESPONSE",
+        result:
+          "GAS_RESPONSE",
 
         pageStartMs:
-          pageStartMs,
+          performance.timeOrigin,
 
         sendStartMs:
           sendStartMs,
@@ -331,11 +572,43 @@ function startSend(){
         responseMs:
           responseMs,
 
+        jsonEndMs:
+          jsonEndMs,
+
         sentDisplayMs:
           sentDisplayMs,
 
+        sendToFetchMs:
+          sendToFetchMs,
+
+        sendToResponseMs:
+          sendToResponseMs,
+
         sendToSentMs:
-          elapsedMs,
+          sendToSentMs,
+
+        fetchMs:
+          Math.round(fetchMs),
+
+        fetchToGasReceiveMs:
+          Math.round(
+            fetchToGasReceiveMs
+          ),
+
+        sendToGasReceiveMs:
+          Math.round(
+            sendToGasReceiveMs
+          ),
+
+        gasInternalMs:
+          Math.round(
+            gasInternalMs
+          ),
+
+        gasCompleteToResponseMs:
+          Math.round(
+            gasCompleteToResponseMs
+          ),
 
         answerId:
           answerId,
@@ -344,29 +617,33 @@ function startSend(){
           player,
 
         selected:
-          selected,
+          selectedForSend,
+
+        storedSelected:
+          storedSelected,
+
+        urlNumber:
+          urlNumber,
 
         number:
           sendNumber,
 
-        stage:
-          tagStage
+        tagStage:
+          tagStage,
+
+        numberMismatch:
+          numberMismatch,
+
+        httpStatus:
+          window.__responseStatus
 
       });
 
 
-      debug.innerText =
-        "送信開始 → 送信しました：" +
-        elapsedMs +
-        " ms\n" +
-        "HTTP：" +
-        responseMs;
-
-
       /*
-      ================================================
-      ★「送信しました」を読める時間にする
-      ================================================
+      =====================================================
+      ★2.5秒だけ表示
+      =====================================================
       */
 
       setTimeout(
@@ -388,14 +665,10 @@ function startSend(){
       const errorMs =
         Date.now();
 
-      const elapsedMs =
+      const errorElapsed =
         errorMs -
         sendStartMs;
 
-
-      /*
-        エラーでもゲームを永久停止させない
-      */
 
       sessionStorage.setItem(
         sendKey,
@@ -403,24 +676,32 @@ function startSend(){
       );
 
 
-      msg.innerText =
+      /*
+         通信エラーでも
+         ゲームを止めない
+      */
+
+      msgDiv.innerText =
         "📩 送信しました！";
 
 
-      debug.innerText =
+      debugDiv.innerText =
         "送信開始 → 通信終了：" +
-        elapsedMs +
-        " ms\n" +
-        "通信：" +
-        String(error);
+        errorElapsed +
+        " ms\n\n" +
+
+        "通信エラー：" +
+        String(error) +
+        "\n\n" +
+
+        "番号：" +
+        sendNumber;
 
 
-      saveHistory({
+      saveSendRecord({
 
-        result:"ERROR",
-
-        pageStartMs:
-          pageStartMs,
+        result:
+          "ERROR",
 
         sendStartMs:
           sendStartMs,
@@ -429,7 +710,7 @@ function startSend(){
           errorMs,
 
         elapsedMs:
-          elapsedMs,
+          errorElapsed,
 
         error:
           String(error),
@@ -438,19 +719,28 @@ function startSend(){
           player,
 
         selected:
-          selected,
+          selectedForSend,
+
+        storedSelected:
+          storedSelected,
+
+        urlNumber:
+          urlNumber,
 
         number:
           sendNumber,
 
-        stage:
-          tagStage
+        tagStage:
+          tagStage,
+
+        numberMismatch:
+          numberMismatch
 
       });
 
 
       /*
-        エラーでも次の問題へ
+         2.5秒後に次へ
       */
 
       setTimeout(

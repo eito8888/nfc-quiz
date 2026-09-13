@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <title>送信中...</title>
+
 <style>
 body{
   font-family:sans-serif;
@@ -10,23 +11,26 @@ body{
   padding-top:18px;
   margin:0
 }
+
 h1{
   font-size:28px;
   margin:0 0 10px
 }
+
 #msg{
   font-size:30px;
   font-weight:bold;
   margin-top:10px
 }
+
 #debug{
   margin:12px auto 0;
-  font-size:14px;
-  line-height:1.18;
+  font-size:16px;
+  line-height:1.22;
   font-weight:bold;
   white-space:pre-line;
   text-align:left;
-  padding:0 10px;
+  padding:0 12px;
   max-width:900px
 }
 </style>
@@ -40,49 +44,54 @@ h1{
 <script>
 
 const GAS_URL =
-  "https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
+"https://script.google.com/macros/s/AKfycbzVLGhB3AqoptBJiGCFk6fAj19xz7NK4cAL-FZYJnADRREf4aXlC4nRHvTUyfS0IgAh/exec";
 
 const msgDiv =
-  document.getElementById("msg");
+document.getElementById("msg");
 
 const debugDiv =
-  document.getElementById("debug");
+document.getElementById("debug");
 
 const player =
-  localStorage.getItem("player");
+localStorage.getItem("player");
 
 const selected =
-  localStorage.getItem("selectedNumber");
+localStorage.getItem("selectedNumber");
 
 const params =
-  new URLSearchParams(location.search);
+new URLSearchParams(location.search);
 
 const dog =
-  params.get("dog");
+params.get("dog");
 
 const number =
-  params.get("number");
+params.get("number");
 
 const tagStage =
-  params.get("stage");
+params.get("stage");
 
 const sendNumber =
-  number || dog;
-
-
-/* =========================================================
-   requestId
-   ========================================================= */
+number || dog;
 
 const sendKey =
-  "sending_" +
-  String(player || "") + "_" +
-  String(selected || "") + "_" +
-  String(sendNumber || "") + "_" +
-  String(tagStage || "");
+"sending_" +
+String(player || "") +
+"_" +
+String(selected || "") +
+"_" +
+String(sendNumber || "") +
+"_" +
+String(tagStage || "");
 
 const requestIdKey =
-  "requestId_" + sendKey;
+"requestId_" + sendKey;
+
+
+/*
+=========================================================
+今回の送信を一意に識別するrequestId
+=========================================================
+*/
 
 let requestId = "";
 
@@ -106,10 +115,8 @@ try{
 if(!requestId){
 
   requestId =
-    (
-      window.crypto &&
-      crypto.randomUUID
-    )
+    window.crypto &&
+    crypto.randomUUID
       ? crypto.randomUUID()
       : (
           "req_" +
@@ -131,13 +138,14 @@ if(!requestId){
     );
 
   }catch(e){}
-
 }
 
 
-/* =========================================================
-   診断保存
-   ========================================================= */
+/*
+=========================================================
+診断履歴
+=========================================================
+*/
 
 function saveSendRecord(record){
 
@@ -175,6 +183,12 @@ function saveSendRecord(record){
 }
 
 
+/*
+=========================================================
+直前診断
+=========================================================
+*/
+
 function saveLastDiagnostic(record){
 
   try{
@@ -196,6 +210,12 @@ function saveLastDiagnostic(record){
 }
 
 
+/*
+=========================================================
+画面表示
+=========================================================
+*/
+
 function showDiagnostic(lines){
 
   debugDiv.innerText =
@@ -204,21 +224,11 @@ function showDiagnostic(lines){
 }
 
 
-function ms(v){
-
-  return (
-    typeof v === "number" &&
-    Number.isFinite(v)
-  )
-    ? Math.round(v)
-    : "取得不可";
-
-}
-
-
-/* =========================================================
-   ブラウザ状態
-   ========================================================= */
+/*
+=========================================================
+ブラウザ状態
+=========================================================
+*/
 
 function getBrowserState(){
 
@@ -233,7 +243,7 @@ function getBrowserState(){
 
   }catch(e){}
 
-  return{
+  return {
 
     online:
       navigator.onLine,
@@ -277,7 +287,7 @@ function getBrowserState(){
 
 function browserLines(s){
 
-  return[
+  return [
 
     "【スマホ・ブラウザ状態】",
 
@@ -291,7 +301,10 @@ function browserLines(s){
       String(s.readyState),
 
     "通信方式：" +
-      (s.effectiveType || "取得不可"),
+      (
+        s.effectiveType ||
+        "取得不可"
+      ),
 
     "推定下り速度：" +
       (
@@ -319,20 +332,25 @@ function browserLines(s){
 }
 
 
-/* =========================================================
-   Resource Timing
-   ========================================================= */
+/*
+=========================================================
+Resource Timing
+=========================================================
+*/
 
 function getResourceTiming(target){
 
   try{
 
     const entries =
-      performance.getEntriesByType("resource");
+      performance.getEntriesByType(
+        "resource"
+      );
 
     const list =
       entries.filter(
-        e => e.name.indexOf(target) === 0
+        e =>
+          e.name.indexOf(target) === 0
       );
 
     if(!list.length){
@@ -347,7 +365,7 @@ function getResourceTiming(target){
     const e =
       list[0];
 
-    return{
+    return {
 
       startTime:
         e.startTime,
@@ -417,18 +435,30 @@ function getResourceTiming(target){
 }
 
 
+function ms(v){
+
+  return (
+    typeof v === "number" &&
+    Number.isFinite(v)
+  )
+    ? Math.round(v)
+    : "取得不可";
+
+}
+
+
 function resourceLines(rt){
 
   if(!rt){
 
-    return[
+    return [
       "【ブラウザ通信計測】",
       "Resource Timing：記録なし"
     ];
 
   }
 
-  return[
+  return [
 
     "【ブラウザ通信計測】",
 
@@ -481,21 +511,36 @@ function resourceLines(rt){
       " bytes",
 
     "protocol：" +
-      (rt.nextHopProtocol || "取得不可"),
+      (
+        rt.nextHopProtocol ||
+        "取得不可"
+      ),
 
     "initiator：" +
-      (rt.initiatorType || "取得不可")
+      (
+        rt.initiatorType ||
+        "取得不可"
+      )
 
   ];
 
 }
 
 
-/* =========================================================
-   GASへクライアント診断を送る
-   ========================================================= */
+/*
+=========================================================
+★ スマホ通信診断をGASへ送る
 
-function sendClientTiming(t){
+メインfetchとは別経路。
+sendBeaconを優先し、
+失敗時だけGET keepaliveへフォールバック。
+
+重要：
+15秒時点ではanswerIdが無くてもrequestIdで送る。
+=========================================================
+*/
+
+function sendDiagnosticToGas(t){
 
   try{
 
@@ -504,7 +549,7 @@ function sendClientTiming(t){
 
     p.set(
       "event",
-      "clientTiming"
+      "sendDiagnostic"
     );
 
     p.set(
@@ -519,55 +564,37 @@ function sendClientTiming(t){
 
     p.set(
       "sendStartMs",
-      t.sendStartMs != null
-        ? String(t.sendStartMs)
-        : ""
+      t.sendStartMs || ""
     );
 
     p.set(
       "fetchStartMs",
-      t.fetchStartMs != null
-        ? String(t.fetchStartMs)
-        : ""
+      t.fetchStartMs || ""
     );
 
-    /*
-     * ★重要
-     * responseMsが未定義でもReferenceErrorにならない。
-     */
     p.set(
       "responseMs",
-      t.responseMs != null
-        ? String(t.responseMs)
-        : ""
+      t.responseMs || ""
     );
 
     p.set(
       "jsonEndMs",
-      t.jsonEndMs != null
-        ? String(t.jsonEndMs)
-        : ""
+      t.jsonEndMs || ""
     );
 
     p.set(
       "sentDisplayMs",
-      t.sentDisplayMs != null
-        ? String(t.sentDisplayMs)
-        : ""
+      t.sentDisplayMs || ""
     );
 
     p.set(
       "timeoutMs",
-      t.timeoutMs != null
-        ? String(t.timeoutMs)
-        : ""
+      t.timeoutMs || ""
     );
 
     p.set(
       "httpStatus",
-      t.httpStatus != null
-        ? String(t.httpStatus)
-        : ""
+      t.httpStatus || ""
     );
 
     p.set(
@@ -639,9 +666,7 @@ function sendClientTiming(t){
 
       p.set(
         k,
-        r[k] != null
-          ? String(r[k])
-          : ""
+        r[k] ?? ""
       );
 
     }
@@ -659,28 +684,23 @@ function sendClientTiming(t){
 
 
     /*
-     * ★診断専用送信
-     *
-     * 本体fetchとは別。
-     * 本体のHTTP応答を待つために
-     * 診断まで止めない。
-     */
+    -------------------------------------------------------
+    sendBeacon
+    -------------------------------------------------------
+    */
 
     try{
 
-      const beaconData =
-        new URLSearchParams(p);
-
-      const accepted =
+      const beaconAccepted =
         navigator.sendBeacon
           ? navigator.sendBeacon(
               GAS_URL,
-              beaconData
+              p
             )
           : false;
 
 
-      if(!accepted){
+      if(!beaconAccepted){
 
         fetch(
           GAS_URL +
@@ -717,7 +737,7 @@ function sendClientTiming(t){
   }catch(e){
 
     console.error(
-      "【clientTiming送信ERROR】",
+      "【スマホ診断送信ERROR】",
       e
     );
 
@@ -726,9 +746,11 @@ function sendClientTiming(t){
 }
 
 
-/* =========================================================
-   本体送信
-   ========================================================= */
+/*
+=========================================================
+メイン送信
+=========================================================
+*/
 
 function send(){
 
@@ -743,6 +765,7 @@ function send(){
       sendStartMs
     ).toISOString();
 
+
   const browserState =
     getBrowserState();
 
@@ -753,7 +776,9 @@ function send(){
     player,
     selected,
     sendNumber,
-    tagStage
+    tagStage,
+    "requestId=",
+    requestId
   );
 
 
@@ -762,12 +787,15 @@ function send(){
 
 
   /*
-   * 二重送信防止
-   */
+  -------------------------------------------------------
+  二重送信防止
+  -------------------------------------------------------
+  */
 
   if(
-    sessionStorage.getItem(sendKey) ===
-    "sending"
+    sessionStorage.getItem(
+      sendKey
+    ) === "sending"
   ){
 
     debugDiv.innerText =
@@ -785,8 +813,10 @@ function send(){
 
 
   /*
-   * fetch開始
-   */
+  -------------------------------------------------------
+  fetch開始
+  -------------------------------------------------------
+  */
 
   const fetchStart =
     performance.now();
@@ -807,13 +837,13 @@ function send(){
 
   console.log(
     "【SEND送信→fetch開始】",
-    sendToFetchMs +
-    " ms"
+    sendToFetchMs + " ms"
   );
 
 
   const url =
-    `${GAS_URL}?player=${encodeURIComponent(player)}` +
+    `${GAS_URL}` +
+    `?player=${encodeURIComponent(player)}` +
     `&selected=${encodeURIComponent(selected)}` +
     `&number=${encodeURIComponent(sendNumber)}` +
     `&tagStage=${encodeURIComponent(tagStage)}` +
@@ -823,28 +853,31 @@ function send(){
 
 
   /*
-   * =======================================================
-   * ★今回の重要変更
-   *
-   * 15秒でfetchをabortしない。
-   *
-   * ただし「ゲーム画面をHTTP応答まで永久に
-   * 待たせる」こともしない。
-   *
-   * 15秒経過時点で診断を送る。
-   * =======================================================
-   */
+  =======================================================
+  ★ 15秒でabortしない
+  =======================================================
+
+  15秒は「通信失敗確定」ではない。
+
+  15秒時点では、
+  「まだHTTP responseが来ていない」
+  という事実だけを記録する。
+
+  fetch自体はそのまま継続する。
+  =======================================================
+  */
 
   let warning15Sent =
     false;
 
 
-  const warning15Id =
+  const timeoutId =
     setTimeout(
       () => {
 
         warning15Sent =
           true;
+
 
         const timeoutNow =
           Date.now();
@@ -853,17 +886,19 @@ function send(){
           performance.now() -
           measureStart;
 
+
         const rt =
           getResourceTiming(
             GAS_URL
           );
+
 
         const bs =
           getBrowserState();
 
 
         let diagnosis =
-          "15秒経過・HTTP応答待ち";
+          "15秒経過・HTTP応答待ち継続";
 
 
         if(
@@ -872,7 +907,7 @@ function send(){
         ){
 
           diagnosis =
-            "HTTP response開始済み";
+            "HTTP response開始まで確認済み";
 
         }else if(
           rt &&
@@ -880,7 +915,7 @@ function send(){
         ){
 
           diagnosis =
-            "HTTP request開始済み・response待ち";
+            "HTTP request開始まで確認済み。response待ち";
 
         }else if(
           rt &&
@@ -888,7 +923,7 @@ function send(){
         ){
 
           diagnosis =
-            "接続開始済み・request待ち";
+            "接続開始まで確認済み。request待ち";
 
         }else if(
           rt &&
@@ -896,42 +931,78 @@ function send(){
         ){
 
           diagnosis =
-            "fetch開始済み・HTTP進行待ち";
+            "fetch開始確認済み。以降の通信進行を計測継続";
 
         }else if(
           bs.online === false
         ){
 
           diagnosis =
-            "navigator.onLine=false";
+            "15秒時点でnavigator.onLine=false";
 
         }
 
 
-        sendClientTiming({
+        /*
+        ---------------------------------------------------
+        ★ ここが今回の重要部分
 
-          requestId,
+        answerIdはまだ無い。
+        しかしrequestIdは既にある。
 
-          sendStartMs,
+        したがってGAS側で診断行を先に作れる。
+        ---------------------------------------------------
+        */
 
-          fetchStartMs,
+        sendDiagnosticToGas({
 
-          responseMs:null,
+          requestId:
 
-          jsonEndMs:null,
+            requestId,
 
-          sentDisplayMs:null,
+          answerId:
+
+            "",
+
+          sendStartMs:
+
+            sendStartMs,
+
+          fetchStartMs:
+
+            fetchStartMs,
+
+          responseMs:
+
+            "",
+
+          jsonEndMs:
+
+            "",
+
+          sentDisplayMs:
+
+            "",
 
           timeoutMs:
+
             timeoutNow,
 
-          httpStatus:"",
+          httpStatus:
 
-          diagnosis,
+            "",
 
-          browserState:bs,
+          browserState:
 
-          resourceTiming:rt
+            bs,
+
+          resourceTiming:
+
+            rt,
+
+          diagnosis:
+
+            diagnosis
 
         });
 
@@ -939,62 +1010,119 @@ function send(){
         saveLastDiagnostic({
 
           result:
-            "OVER_15S",
+            "OVER_15S_WAITING",
 
           time:
             startTime,
 
-          sendStartMs,
+          requestId:
+            requestId,
 
-          fetchStartMs,
+          sendStartMs:
+            sendStartMs,
 
-          requestId,
+          fetchStartMs:
+            fetchStartMs,
+
+          timeoutMs:
+            timeoutNow,
 
           elapsedMs:
             Math.round(elapsed),
 
-          player,
+          player:
+            player,
 
-          selected,
+          selected:
+            selected,
 
           number:
             sendNumber,
 
-          tagStage,
+          tagStage:
+            tagStage,
 
-          diagnosis,
+          diagnosis:
+            diagnosis,
 
-          browserState:bs,
+          browserState:
+            bs,
 
-          resourceTiming:rt
+          resourceTiming:
+            rt
 
         });
 
+
+        showDiagnostic([
+
+          "【送信診断】15秒経過",
+
+          "送信開始 → fetch開始：" +
+            sendToFetchMs +
+            " ms",
+
+          "fetch開始 → 15秒警告：" +
+            Math.round(
+              performance.now() -
+              fetchStart
+            ) +
+            " ms",
+
+          "HTTP response：未受信",
+
+          "JSON解析：未実行",
+
+          "answerId：未取得",
+
+          "requestId：" +
+            requestId,
+
+          "【重要】fetchは継続中",
+
+          "【判定】" +
+            diagnosis,
+
+          ...browserLines(bs),
+
+          ...resourceLines(rt)
+
+        ]);
+
       },
+
       15000
+
     );
 
 
   /*
-   * =======================================================
-   * 本体HTTP
-   * =======================================================
-   */
+  =======================================================
+  ★ メインHTTP通信
+  =======================================================
+  */
 
   fetch(
     url,
     {
-      method:"GET",
-      cache:"no-store"
+      method:
+        "GET",
+
+      cache:
+        "no-store"
+
     }
   )
 
+
+  /*
+  =======================================================
+  E HTTP response受信
+  =======================================================
+  */
+
   .then(
     response => {
-
-      /*
-       * ★HTTP応答を受けた瞬間
-       */
 
       const responseMs =
         Date.now();
@@ -1014,15 +1142,74 @@ function send(){
         response.status;
 
 
+      clearTimeout(
+        timeoutId
+      );
+
+
       console.log(
-        "【SEND GAS応答】",
+        "【SEND HTTP response受信】",
         response.status,
         responseMs,
         responseElapsed
       );
 
 
-      if(!response.ok){
+      /*
+      ---------------------------------------------------
+      Eをこの時点で別経路からGASへ送る
+
+      ここではまだanswerIdは無い。
+      requestIdだけで送る。
+      ---------------------------------------------------
+      */
+
+      sendDiagnosticToGas({
+
+        requestId:
+          requestId,
+
+        answerId:
+          "",
+
+        sendStartMs:
+          sendStartMs,
+
+        fetchStartMs:
+          fetchStartMs,
+
+        responseMs:
+          responseMs,
+
+        jsonEndMs:
+          "",
+
+        sentDisplayMs:
+          "",
+
+        timeoutMs:
+          "",
+
+        httpStatus:
+          response.status,
+
+        browserState:
+          getBrowserState(),
+
+        resourceTiming:
+          getResourceTiming(GAS_URL),
+
+        diagnosis:
+          warning15Sent
+            ? "15秒超過後にHTTP response受信"
+            : "HTTP response受信"
+
+      });
+
+
+      if(
+        !response.ok
+      ){
 
         throw new Error(
           "HTTP " +
@@ -1032,41 +1219,21 @@ function send(){
       }
 
 
-      /*
-       * response.json()完了まで
-       */
-
-      return response
-        .json()
-        .then(
-          data => ({
-            data,
-            responseMs,
-            responseElapsed
-          })
-        );
+      return response.json();
 
     }
   )
 
+
+  /*
+  =======================================================
+  F response.json()完了
+  G answerId取得
+  =======================================================
+  */
+
   .then(
-    result => {
-
-      /*
-       * ===================================================
-       * JSON完了
-       * ===================================================
-       */
-
-      const data =
-        result.data;
-
-      const responseMs =
-        result.responseMs;
-
-      const responseElapsed =
-        result.responseElapsed;
-
+    data => {
 
       const jsonEnd =
         performance.now();
@@ -1075,20 +1242,14 @@ function send(){
         Date.now();
 
 
-      clearTimeout(
-        warning15Id
-      );
-
-
       const fetchTime =
         jsonEnd -
         fetchStart;
 
 
-      const answerId =
-        String(
-          data.answerId || ""
-        ).trim();
+      const responseMs =
+        window.__sendResponseMs ||
+        0;
 
 
       const gasReceiveMs =
@@ -1104,11 +1265,34 @@ function send(){
 
 
       /*
-       * fetch開始 → GAS受信
-       */
+      ---------------------------------------------------
+      G answerId
+      ---------------------------------------------------
+      */
+
+      const answerId =
+        String(
+          data.answerId || ""
+        ).trim();
+
+
+      const gasInternalMs =
+        (
+          gasReceiveMs &&
+          gasCompleteMs
+        )
+          ? (
+              gasCompleteMs -
+              gasReceiveMs
+            )
+          : 0;
+
 
       const fetchToGasReceiveMs =
-        gasReceiveMs
+        (
+          gasReceiveMs &&
+          fetchStartMs
+        )
           ? Math.max(
               0,
               Math.round(
@@ -1119,45 +1303,29 @@ function send(){
           : 0;
 
 
-      /*
-       * GAS内部処理
-       */
-
-      const gasInternalMs =
-        (
-          gasReceiveMs &&
-          gasCompleteMs
-        )
+      const sendToGasReceiveMs =
+        gasReceiveMs
           ? Math.max(
               0,
-              gasCompleteMs -
-              gasReceiveMs
+              Math.round(
+                gasReceiveMs -
+                sendStartMs
+              )
             )
           : 0;
 
-
-      /*
-       * GAS処理完了 → HTTP応答
-       */
 
       const gasCompleteToResponseMs =
         (
           gasCompleteMs &&
           responseMs
         )
-          ? Math.max(
-              0,
-              Math.round(
-                responseMs -
-                gasCompleteMs
-              )
+          ? Math.round(
+              responseMs -
+              gasCompleteMs
             )
           : 0;
 
-
-      /*
-       * GAS外の時間
-       */
 
       const gasOutsideMs =
         Math.max(
@@ -1170,24 +1338,18 @@ function send(){
 
 
       /*
-       * ===================================================
-       * ★ここで「送信しました」を記録
-       *
-       * response.json()まで完了した時点。
-       * ===================================================
-       */
+      ---------------------------------------------------
+      「送信しました」表示時刻
+      ---------------------------------------------------
+      */
 
       const sentDisplayMs =
         Date.now();
 
-      const sentDisplayElapsed =
+      const sendDisplayTime =
         performance.now() -
         measureStart;
 
-
-      /*
-       * JSON解析時間
-       */
 
       const jsonParseMs =
         Math.max(
@@ -1196,7 +1358,10 @@ function send(){
             jsonEnd -
             (
               measureStart +
-              responseElapsed
+              (
+                window.__sendResponseElapsed ||
+                0
+              )
             )
           )
         );
@@ -1207,6 +1372,7 @@ function send(){
           GAS_URL
         );
 
+
       const bs =
         getBrowserState();
 
@@ -1215,19 +1381,22 @@ function send(){
         window.__sendResponseStatus;
 
 
-      /*
-       * ===================================================
-       * 画面表示
-       * ===================================================
-       */
-
       msgDiv.innerText =
         "📩 送信しました！";
 
 
+      /*
+      ---------------------------------------------------
+      診断表示
+      ---------------------------------------------------
+      */
+
       showDiagnostic([
 
         "【今回の送信診断】",
+
+        "requestId：" +
+          requestId,
 
         "answerId：" +
           answerId,
@@ -1240,15 +1409,19 @@ function send(){
           fetchToGasReceiveMs +
           " ms",
 
-        "fetch開始 → HTTP応答：" +
+        "fetch開始 → HTTP response：" +
           Math.round(fetchTime) +
+          " ms",
+
+        "送信開始 → GAS受信（目安）：" +
+          sendToGasReceiveMs +
           " ms",
 
         "GAS受信 → GAS処理完了：" +
           Math.round(gasInternalMs) +
           " ms",
 
-        "GAS処理完了 → HTTP応答：" +
+        "GAS処理完了 → HTTP response（目安）：" +
           gasCompleteToResponseMs +
           " ms",
 
@@ -1256,19 +1429,23 @@ function send(){
           gasOutsideMs +
           " ms",
 
+        "HTTP response → JSON完了：" +
+          jsonParseMs +
+          " ms",
+
         "送信開始 →「送信しました」：" +
-          Math.round(sentDisplayElapsed) +
+          Math.round(sendDisplayTime) +
           " ms",
 
         "HTTP：" +
           status,
 
-        "JSON完了：" +
-          jsonEndMs,
-
-        "JSON解析時間：" +
-          jsonParseMs +
-          " ms",
+        "15秒超過：" +
+          (
+            warning15Sent
+              ? "はい"
+              : "いいえ"
+          ),
 
         ...browserLines(bs),
 
@@ -1278,10 +1455,72 @@ function send(){
 
 
       /*
-       * ===================================================
-       * 保存
-       * ===================================================
-       */
+      ===================================================
+      ★ E/F/Gを一括してGASへ送る
+
+      E responseMs
+      F jsonEndMs
+      G answerId
+
+      これでrequestIdだけで作られた診断行を
+      answerId付きの通常行へ紐付ける。
+      ===================================================
+      */
+
+      sendDiagnosticToGas({
+
+        requestId:
+          requestId,
+
+        answerId:
+          answerId,
+
+        sendStartMs:
+          sendStartMs,
+
+        fetchStartMs:
+          fetchStartMs,
+
+        responseMs:
+          responseMs,
+
+        jsonEndMs:
+          jsonEndMs,
+
+        sentDisplayMs:
+          sentDisplayMs,
+
+        timeoutMs:
+          "",
+
+        httpStatus:
+          status,
+
+        browserState:
+          bs,
+
+        resourceTiming:
+          rt,
+
+        diagnosis:
+          warning15Sent
+            ? "15秒超過後にHTTP response受信・answerId取得"
+            : "正常",
+
+        errorName:
+          "",
+
+        errorMessage:
+          ""
+
+      });
+
+
+      /*
+      ---------------------------------------------------
+      ローカル診断保存
+      ---------------------------------------------------
+      */
 
       const diagnostic = {
 
@@ -1291,56 +1530,80 @@ function send(){
         time:
           startTime,
 
-        sendStartMs,
+        requestId:
+          requestId,
 
-        fetchStartMs,
+        sendStartMs:
+          sendStartMs,
 
-        requestId,
+        fetchStartMs:
+          fetchStartMs,
 
-        responseMs,
+        responseMs:
+          responseMs,
 
-        jsonEndMs,
+        jsonEndMs:
+          jsonEndMs,
 
-        sentDisplayMs,
+        sentDisplayMs:
+          sentDisplayMs,
 
-        answerId,
+        answerId:
+          answerId,
 
-        player,
+        player:
+          player,
 
-        selected,
+        selected:
+          selected,
 
-        dog,
+        dog:
+          dog,
 
         number:
           sendNumber,
 
-        tagStage,
+        tagStage:
+          tagStage,
 
         fetchMs:
-          Math.round(fetchTime),
+          Math.round(
+            fetchTime
+          ),
 
-        sendToFetchMs,
+        sendToFetchMs:
+          sendToFetchMs,
 
-        fetchToGasReceiveMs,
+        fetchToGasReceiveMs:
+          fetchToGasReceiveMs,
 
-        gasReceiveMs,
-
-        gasCompleteMs,
+        sendToGasReceiveMs:
+          sendToGasReceiveMs,
 
         gasInternalMs:
-          Math.round(gasInternalMs),
+          Math.round(
+            gasInternalMs
+          ),
 
-        gasCompleteToResponseMs,
+        gasCompleteToResponseMs:
+          gasCompleteToResponseMs,
 
-        gasOutsideMs,
+        gasOutsideMs:
+          gasOutsideMs,
 
         sendToDisplayMs:
-          Math.round(sentDisplayElapsed),
+          Math.round(
+            sendDisplayTime
+          ),
 
         httpStatus:
           status,
 
-        jsonParseMs,
+        jsonParseMs:
+          jsonParseMs,
+
+        warning15Sent:
+          warning15Sent,
 
         browserState:
           bs,
@@ -1361,51 +1624,10 @@ function send(){
 
 
       /*
-       * ===================================================
-       * ★GASへ診断送信
-       *
-       * responseMsを必ず明示的に渡す。
-       * ===================================================
-       */
-
-      sendClientTiming({
-
-        requestId,
-
-        answerId,
-
-        sendStartMs,
-
-        fetchStartMs,
-
-        responseMs,
-
-        jsonEndMs,
-
-        sentDisplayMs,
-
-        httpStatus:
-          status,
-
-        browserState:
-          bs,
-
-        resourceTiming:
-          rt,
-
-        diagnosis:
-          warning15Sent
-            ? "15秒超過後にHTTP応答受信"
-            : "正常"
-
-      });
-
-
-      /*
-       * ★ゲーム画面へ戻る
-       *
-       * 送信しました表示を十分読める時間確保。
-       */
+      ---------------------------------------------------
+      15秒後に遷移
+      ---------------------------------------------------
+      */
 
       setTimeout(
         () => {
@@ -1414,29 +1636,31 @@ function send(){
             "player.html";
 
         },
-        5000
+        15000
       );
 
     }
   )
 
+
+  /*
+  =======================================================
+  通信ERROR
+  =======================================================
+  */
+
   .catch(
     error => {
 
-      /*
-       * ===================================================
-       * HTTP ERROR
-       * ===================================================
-       */
-
       clearTimeout(
-        warning15Id
+        timeoutId
       );
 
 
       const errorTime =
         performance.now() -
         measureStart;
+
 
       const errorMs =
         Date.now();
@@ -1453,6 +1677,7 @@ function send(){
           GAS_URL
         );
 
+
       const bs =
         getBrowserState();
 
@@ -1468,22 +1693,12 @@ function send(){
         String(error);
 
 
-      /*
-       * ★HTTPエラーでも
-       * 「送信しました」を表示
-       *
-       * GAS側で回答が受理されている可能性が
-       * あるため。
-       */
+      const diagnosis =
+        "HTTP通信ERROR";
+
 
       msgDiv.innerText =
-        "📩 送信しました！";
-
-
-      const diagnosis =
-        errorName === "AbortError"
-          ? "通信がabortされました"
-          : "HTTP通信ERROR";
+        "📩 送信確認中";
 
 
       showDiagnostic([
@@ -1493,6 +1708,9 @@ function send(){
         "送信開始 → ERROR：" +
           Math.round(errorTime) +
           " ms",
+
+        "requestId：" +
+          requestId,
 
         "error：" +
           errorMessage,
@@ -1508,13 +1726,56 @@ function send(){
 
 
       /*
-       * ===================================================
-       * ★ERROR時にも「送信しました」の時刻を記録
-       * ===================================================
-       */
+      ---------------------------------------------------
+      ★ ERRORでもrequestIdで診断を残す
+      ---------------------------------------------------
+      */
 
-      const sentDisplayMs =
-        Date.now();
+      sendDiagnosticToGas({
+
+        requestId:
+          requestId,
+
+        answerId:
+          "",
+
+        sendStartMs:
+          sendStartMs,
+
+        fetchStartMs:
+          fetchStartMs,
+
+        responseMs:
+          "",
+
+        jsonEndMs:
+          "",
+
+        sentDisplayMs:
+          Date.now(),
+
+        timeoutMs:
+          "",
+
+        httpStatus:
+          "",
+
+        browserState:
+          bs,
+
+        resourceTiming:
+          rt,
+
+        diagnosis:
+          diagnosis,
+
+        errorName:
+          errorName,
+
+        errorMessage:
+          errorMessage
+
+      });
 
 
       const diagnostic = {
@@ -1525,37 +1786,43 @@ function send(){
         time:
           startTime,
 
-        sendStartMs,
+        sendStartMs:
+          sendStartMs,
 
-        fetchStartMs,
+        fetchStartMs:
+          fetchStartMs,
 
-        requestId,
+        requestId:
+          requestId,
 
-        responseMs:null,
-
-        jsonEndMs:null,
-
-        sentDisplayMs,
-
-        errorMs,
+        errorMs:
+          errorMs,
 
         elapsedMs:
-          Math.round(errorTime),
+          Math.round(
+            errorTime
+          ),
 
-        errorMessage,
+        errorMessage:
+          errorMessage,
 
-        errorName,
+        errorName:
+          errorName,
 
-        player,
+        player:
+          player,
 
-        selected,
+        selected:
+          selected,
 
         number:
           sendNumber,
 
-        tagStage,
+        tagStage:
+          tagStage,
 
-        diagnosis,
+        diagnosis:
+          diagnosis,
 
         browserState:
           bs,
@@ -1575,49 +1842,6 @@ function send(){
       );
 
 
-      /*
-       * ===================================================
-       * ★ERRORでもGASへ診断
-       * ===================================================
-       */
-
-      sendClientTiming({
-
-        requestId,
-
-        answerId:"",
-
-        sendStartMs,
-
-        fetchStartMs,
-
-        responseMs:null,
-
-        jsonEndMs:null,
-
-        sentDisplayMs,
-
-        httpStatus:"",
-
-        browserState:
-          bs,
-
-        resourceTiming:
-          rt,
-
-        diagnosis,
-
-        errorName,
-
-        errorMessage
-
-      });
-
-
-      /*
-       * ★ERRORでも5秒後にplayerへ
-       */
-
       setTimeout(
         () => {
 
@@ -1625,7 +1849,7 @@ function send(){
             "player.html";
 
         },
-        5000
+        15000
       );
 
     }
@@ -1633,10 +1857,6 @@ function send(){
 
 }
 
-
-/* =========================================================
-   開始
-   ========================================================= */
 
 send();
 

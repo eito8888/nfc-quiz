@@ -240,7 +240,7 @@ function sendMonitorTiming(
     "&monitorStatus=" + encodeURIComponent(diagnostic.monitorStatus || "OK") +
     "&_=" + Date.now();
 
-  fetch(url, {method:"GET", cache:"no-store"})
+  fetch(url, {method:"GET", cache:"no-store", keepalive:true})
     .then(() => {
       window.monitorTimingSent.add(answerId);
       console.log("【原因追及 timing_log送信完了】", "answerId=" + answerId);
@@ -262,7 +262,7 @@ function sendMonitorTimeout(startWallMs, elapsedMs, errorName) {
     "&monitorError=" + encodeURIComponent(errorName || "TIMEOUT") +
     "&_=" + Date.now();
 
-  fetch(url, {method:"GET", cache:"no-store"})
+  fetch(url, {method:"GET", cache:"no-store", keepalive:true})
     .catch(error => console.error("【原因追及 MonitorTimeout記録エラー】", error));
 }
 
@@ -290,26 +290,27 @@ async function load() {
       Date.now();
 
 
-    const monitorController = new AbortController();
+    // 8秒は「警告値」として計測するだけで、fetch自体はabortしない。
+    // 以前の8秒abortは、遅い時にMonitor更新そのものを途中で切って
+    // TRUE/写真表示をさらに遅らせる可能性があるため。
     const monitorTimeoutMs = 8000;
-    const monitorTimeoutId = setTimeout(() => monitorController.abort(), monitorTimeoutMs);
+    const monitorTimeoutId = setTimeout(() => {
+      const elapsed = performance.now() - fetchStart;
+      console.warn("【原因追及 Monitor FETCH 8秒超】", Math.round(elapsed) + "ms");
+      sendMonitorTimeout(fetchStartWallMs, Math.round(elapsed), "8秒超過（fetch継続）");
+    }, monitorTimeoutMs);
+
     let res;
 
     try {
       res = await fetch(GAS_URL, {
-        cache: "no-store",
-        signal: monitorController.signal
+        cache: "no-store"
       });
     } catch (fetchError) {
       clearTimeout(monitorTimeoutId);
       const elapsed = performance.now() - fetchStart;
       const name = fetchError && fetchError.name ? fetchError.name : "fetchError";
-      if (name === "AbortError") {
-        console.error("【原因追及 Monitor FETCH TIMEOUT】", Math.round(elapsed) + "ms");
-        sendMonitorTimeout(fetchStartWallMs, Math.round(elapsed), "AbortError");
-      } else {
-        console.error("【原因追及 Monitor FETCH ERROR】", name, Math.round(elapsed) + "ms");
-      }
+      console.error("【原因追及 Monitor FETCH ERROR】", name, Math.round(elapsed) + "ms");
       return;
     }
 
@@ -1142,6 +1143,14 @@ async function load() {
         }
 
 
+        const preloadImageObject =
+          preloadedImages.get(imageSrc);
+
+        // preloadが完了済みなら、DOM画像の読み込み待ちを実測上0msとして扱う。
+        // 未完了ならDOM画像のloadイベントまでを実測する。
+        const imageAlreadyComplete =
+          !!(preloadImageObject && preloadImageObject.complete);
+
         const imageStart =
           performance.now();
 
@@ -1268,6 +1277,11 @@ async function load() {
                 imageLoadTime
               ) +
               "ms"
+            );
+
+            console.log(
+              "写真先読み完了済み=" +
+              String(imageAlreadyComplete)
             );
 
 

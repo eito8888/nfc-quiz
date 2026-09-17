@@ -126,6 +126,9 @@ const GAS_URL =
 const preloadedImages =
   new Map();
 
+/* 前回と画面内容が同じならDOMを作り直さない */
+let lastRenderSignature = "";
+
 
 function preloadImage(src) {
 
@@ -217,53 +220,75 @@ if (
 
 function sendMonitorTiming(
   answerId,
-  diagnostic
+  monitorFetchMs,
+  trueDisplayMs,
+  photoDisplayMs
 ) {
-  if (!answerId || !diagnostic) return;
-  if (window.monitorTimingSent.has(answerId)) return;
 
-  const url = GAS_URL +
+  if (!answerId) {
+    return;
+  }
+
+
+  if (
+    window.monitorTimingSent
+      .has(answerId)
+  ) {
+
+    return;
+  }
+
+
+  const url =
+    GAS_URL +
     "?event=monitorTiming" +
-    "&answerId=" + encodeURIComponent(answerId) +
-    "&monitorFetchMs=" + encodeURIComponent(diagnostic.monitorFetchMs || 0) +
-    "&trueDisplayMs=" + encodeURIComponent(diagnostic.trueDisplayMs || 0) +
-    "&photoDisplayMs=" + encodeURIComponent(diagnostic.photoDisplayMs || 0) +
-    "&monitorFetchStartWallMs=" + encodeURIComponent(diagnostic.monitorFetchStartWallMs || 0) +
-    "&monitorFetchEndWallMs=" + encodeURIComponent(diagnostic.monitorFetchEndWallMs || 0) +
-    "&monitorFetchDurationMs=" + encodeURIComponent(diagnostic.monitorFetchDurationMs || 0) +
-    "&jsonTimeMs=" + encodeURIComponent(diagnostic.jsonTimeMs || 0) +
-    "&fetchEndToDetectMs=" + encodeURIComponent(diagnostic.fetchEndToDetectMs || 0) +
-    "&detectToTrueMs=" + encodeURIComponent(diagnostic.detectToTrueMs || 0) +
-    "&trueToPhotoMs=" + encodeURIComponent(diagnostic.trueToPhotoMs || 0) +
-    "&imageLoadTimeMs=" + encodeURIComponent(diagnostic.imageLoadTimeMs || 0) +
-    "&loadToPhotoMs=" + encodeURIComponent(diagnostic.loadToPhotoMs || 0) +
-    "&monitorStatus=" + encodeURIComponent(diagnostic.monitorStatus || "OK") +
-    "&_=" + Date.now();
-
-  fetch(url, {method:"GET", cache:"no-store", keepalive:true})
-    .then(() => {
-      window.monitorTimingSent.add(answerId);
-      console.log("【原因追及 timing_log送信完了】", "answerId=" + answerId);
-    })
-    .catch(error => console.error("【原因追及 timing_log送信エラー】", error));
-}
+    "&answerId=" +
+    encodeURIComponent(answerId) +
+    "&monitorFetchMs=" +
+    encodeURIComponent(monitorFetchMs) +
+    "&trueDisplayMs=" +
+    encodeURIComponent(trueDisplayMs) +
+    "&photoDisplayMs=" +
+    encodeURIComponent(photoDisplayMs) +
+    "&_=" +
+    Date.now();
 
 
+  fetch(
+    url,
+    {
+      method: "GET",
+      cache: "no-store"
+    }
+  )
 
-/* =========================================================
-   Monitor取得TIMEOUT記録
-   1回のGAS取得が8秒を超えた場合だけ記録
-   ========================================================= */
-function sendMonitorTimeout(startWallMs, elapsedMs, errorName) {
-  const url = GAS_URL +
-    "?event=monitorTimeout" +
-    "&monitorFetchStartWallMs=" + encodeURIComponent(startWallMs) +
-    "&monitorTimeoutMs=" + encodeURIComponent(elapsedMs) +
-    "&monitorError=" + encodeURIComponent(errorName || "TIMEOUT") +
-    "&_=" + Date.now();
+  .then(
+    () => {
 
-  fetch(url, {method:"GET", cache:"no-store", keepalive:true})
-    .catch(error => console.error("【原因追及 MonitorTimeout記録エラー】", error));
+      window.monitorTimingSent
+        .add(answerId);
+
+
+      console.log(
+        "【原因追及 timing_log送信完了】",
+        "answerId=" +
+        answerId
+      );
+
+    }
+  )
+
+  .catch(
+    error => {
+
+      console.error(
+        "【原因追及 timing_log送信エラー】",
+        error
+      );
+
+    }
+  );
+
 }
 
 
@@ -286,38 +311,38 @@ async function load() {
     const fetchStart =
       performance.now();
 
-    const fetchStartWallMs =
-      Date.now();
 
+    /*
+       Monitor取得が長時間止まると、
+       次の回答確認まで一緒に止まってしまう。
+       4秒で今回の取得だけ中止し、次の周期で再取得する。
+    */
+    const controller =
+      new AbortController();
 
-    // 8秒は「警告値」として計測するだけで、fetch自体はabortしない。
-    // 以前の8秒abortは、遅い時にMonitor更新そのものを途中で切って
-    // TRUE/写真表示をさらに遅らせる可能性があるため。
-    const monitorTimeoutMs = 8000;
-    const monitorTimeoutId = setTimeout(() => {
-      const elapsed = performance.now() - fetchStart;
-      console.warn("【原因追及 Monitor FETCH 8秒超】", Math.round(elapsed) + "ms");
-      sendMonitorTimeout(fetchStartWallMs, Math.round(elapsed), "8秒超過（fetch継続）");
-    }, monitorTimeoutMs);
+    const timeoutId =
+      setTimeout(() => controller.abort(), 4000);
+
+    const requestUrl =
+      GAS_URL + "?_=" + Date.now();
 
     let res;
 
     try {
-      res = await fetch(GAS_URL, {
-        cache: "no-store"
-      });
-    } catch (fetchError) {
-      clearTimeout(monitorTimeoutId);
-      const elapsed = performance.now() - fetchStart;
-      const name = fetchError && fetchError.name ? fetchError.name : "fetchError";
-      console.error("【原因追及 Monitor FETCH ERROR】", name, Math.round(elapsed) + "ms");
-      return;
+      res =
+        await fetch(
+          requestUrl,
+          {
+            cache: "no-store",
+            signal: controller.signal
+          }
+        );
+    } finally {
+      clearTimeout(timeoutId);
     }
 
-    clearTimeout(monitorTimeoutId);
-
-    const fetchEnd = performance.now();
-    const fetchEndWallMs = Date.now();
+    const fetchEnd =
+      performance.now();
 
 
     /* -----------------------------------------
@@ -345,6 +370,15 @@ async function load() {
     const dataReceiveTime =
       jsonEnd -
       loadStart;
+
+    console.log(
+      "【診断 LOAD/GAS】",
+      "load開始→fetch開始=" + Math.round(fetchStart-loadStart) + "ms",
+      "fetch=" + Math.round(fetchEnd-fetchStart) + "ms",
+      "JSON=" + Math.round(jsonTime) + "ms",
+      "load開始→JSON完了=" + Math.round(jsonEnd-loadStart) + "ms",
+      "HTTP=" + res.status
+    );
 
 
     /*
@@ -415,6 +449,33 @@ async function load() {
       );
 
     }
+
+
+    /*
+       画面内容の署名。
+       回答が増えた/正解状態が変わった/Stageが変わった時だけ
+       DOMを作り直す。
+    */
+    const renderSignature =
+      JSON.stringify({
+        stage: currentStage,
+        answers: (data.answers || []).map(row => [
+          row[0], row[1], row[3], row[4], row[7]
+        ]),
+        questions: (data.questions || []).map(q => [
+          q[0], q[1], q[3], q[4], q[5]
+        ]),
+        scores: data.scoreList || []
+      });
+
+    if (renderSignature === lastRenderSignature) {
+      console.log(
+        "【MONITOR】画面変更なし。DOM更新を省略"
+      );
+      return;
+    }
+
+    lastRenderSignature = renderSignature;
 
 
     /* =====================================================
@@ -638,47 +699,23 @@ async function load() {
                 monitorFetchMs:
                   monitorFetchMs,
 
-                monitorFetchStartWallMs:
-                  fetchStartWallMs,
-
-                monitorFetchEndWallMs:
-                  fetchEndWallMs,
-
-                answerDetectedWallMs:
-                  Date.now(),
-
-                gasRecordWallMs:
-                  Date.parse(row[6]),
-
                 trueDisplayMs:
                   0,
 
                 photoDisplayMs:
                   0,
 
-                monitorFetchDurationMs:
-                  Math.round(fetchEnd - fetchStart),
-
-                jsonTimeMs:
-                  Math.round(jsonTime),
-
-                fetchEndToDetectMs:
+                answerDetectedPerf:
                   0,
 
-                detectToTrueMs:
+                gasRecordToDetectMs:
+                  null,
+
+                trueDisplayPerf:
                   0,
 
-                trueToPhotoMs:
+                photoDisplayPerf:
                   0,
-
-                imageLoadTimeMs:
-                  0,
-
-                loadToPhotoMs:
-                  0,
-
-                monitorStatus:
-                  "OK",
 
                 trueLogged:
                   false,
@@ -739,62 +776,31 @@ async function load() {
               );
 
 
-              const answerDetectedWallMs =
-                diagnostic.answerDetectedWallMs;
+              const answerDetectedPerf = performance.now();
+              const answerDetectedWallClock = Date.now();
 
-              diagnostic.fetchEndToDetectMs = Math.max(
-                0,
-                answerDetectedWallMs - diagnostic.monitorFetchEndWallMs
-              );
+              let gasRecordToDetectMs = null;
+              const gasRecordTime = new Date(row[6]).getTime();
 
-              const fetchDurationMs =
-                diagnostic.monitorFetchEndWallMs -
-                diagnostic.monitorFetchStartWallMs;
+              if (Number.isFinite(gasRecordTime)) {
+                gasRecordToDetectMs =
+                  answerDetectedWallClock - gasRecordTime;
+              }
 
-              const fetchEndToDetectMs =
-                answerDetectedWallMs -
-                diagnostic.monitorFetchEndWallMs;
-
-              const gasRecordToDetectMs =
-                Number.isFinite(diagnostic.gasRecordWallMs)
-                  ? answerDetectedWallMs - diagnostic.gasRecordWallMs
-                  : null;
+              diagnostic.answerDetectedPerf = answerDetectedPerf;
+              diagnostic.gasRecordToDetectMs = gasRecordToDetectMs;
 
               console.log(
+                "【原因追及 回答検知】",
+                "番号=" + selected,
+                "answerId=" + answerId,
+                "GAS回答記録時刻=" + row[6],
+                "GAS記録→Monitor検知=" +
+                  (gasRecordToDetectMs === null
+                    ? "計算不可"
+                    : Math.round(gasRecordToDetectMs) + "ms"),
                 "今回load開始→回答検知=" +
-                Math.round(
-                  performance.now() -
-                  loadStart
-                ) +
-                "ms"
-              );
-
-              console.log(
-                "Monitor fetch開始→完了=" +
-                Math.round(fetchDurationMs) +
-                "ms"
-              );
-
-              console.log(
-                "fetch完了→回答検知=" +
-                Math.round(fetchEndToDetectMs) +
-                "ms"
-              );
-
-              console.log(
-                "GAS記録→Monitor回答検知=" +
-                (gasRecordToDetectMs === null
-                  ? "計測不可"
-                  : Math.round(gasRecordToDetectMs) +
-                    "ms（端末時計差の影響あり）")
-              );
-
-              console.log(
-                "【原因追及 区間判定】",
-                "Monitor fetch=" +
-                Math.round(fetchDurationMs) + "ms",
-                "fetch後検知=" +
-                Math.round(fetchEndToDetectMs) + "ms"
+                  Math.round(answerDetectedPerf-loadStart) + "ms"
               );
 
             }
@@ -1016,6 +1022,9 @@ async function load() {
     const trueDisplayMs =
       Date.now();
 
+    const trueDisplayPerf =
+      performance.now();
+
 
     /*
        新回答すべてに
@@ -1028,10 +1037,8 @@ async function load() {
         diagnostic.trueDisplayMs =
           trueDisplayMs;
 
-        diagnostic.detectToTrueMs = Math.max(
-          0,
-          trueDisplayMs - diagnostic.answerDetectedWallMs
-        );
+        diagnostic.trueDisplayPerf =
+          trueDisplayPerf;
 
 
         diagnostic.trueLogged =
@@ -1064,24 +1071,6 @@ async function load() {
         console.log(
           "Monitor取得時刻=" +
           diagnostic.monitorFetchMs
-        );
-
-        console.log(
-          "Monitor fetch時間=" +
-          Math.round(
-            diagnostic.monitorFetchEndWallMs -
-            diagnostic.monitorFetchStartWallMs
-          ) +
-          "ms"
-        );
-
-        console.log(
-          "fetch完了→TRUE=" +
-          Math.round(
-            diagnostic.trueDisplayMs -
-            diagnostic.monitorFetchEndWallMs
-          ) +
-          "ms"
         );
 
       }
@@ -1143,14 +1132,6 @@ async function load() {
         }
 
 
-        const preloadImageObject =
-          preloadedImages.get(imageSrc);
-
-        // preloadが完了済みなら、DOM画像の読み込み待ちを実測上0msとして扱う。
-        // 未完了ならDOM画像のloadイベントまでを実測する。
-        const imageAlreadyComplete =
-          !!(preloadImageObject && preloadImageObject.complete);
-
         const imageStart =
           performance.now();
 
@@ -1198,9 +1179,15 @@ async function load() {
             const photoDisplayMs =
               Date.now();
 
+            const photoDisplayPerf =
+              performance.now();
+
 
             diagnostic.photoDisplayMs =
               photoDisplayMs;
+
+            diagnostic.photoDisplayPerf =
+              photoDisplayPerf;
 
 
             console.log(
@@ -1230,24 +1217,6 @@ async function load() {
               diagnostic.monitorFetchMs
             );
 
-            console.log(
-              "Monitor fetch時間=" +
-              Math.round(
-                diagnostic.monitorFetchEndWallMs -
-                diagnostic.monitorFetchStartWallMs
-              ) +
-              "ms"
-            );
-
-            console.log(
-              "fetch完了→TRUE=" +
-              Math.round(
-                diagnostic.trueDisplayMs -
-                diagnostic.monitorFetchEndWallMs
-              ) +
-              "ms"
-            );
-
 
             console.log(
               "TRUE=" +
@@ -1264,10 +1233,31 @@ async function load() {
             console.log(
               "TRUE→写真=" +
               Math.round(
-                photoDisplayMs -
-                diagnostic.trueDisplayMs
+                photoDisplayPerf -
+                (diagnostic.trueDisplayPerf || trueDisplayPerf)
               ) +
               "ms"
+            );
+
+            console.log(
+              "【原因追及 区間判定】",
+              "GAS記録→Monitor検知=" +
+                (diagnostic.gasRecordToDetectMs === null
+                  ? "計算不可"
+                  : Math.round(diagnostic.gasRecordToDetectMs) + "ms"),
+              "Monitor fetch=" +
+                Math.round(fetchEnd-fetchStart) + "ms",
+              "回答検知→TRUE=" +
+                (diagnostic.answerDetectedPerf
+                  ? Math.round(
+                      trueDisplayPerf-diagnostic.answerDetectedPerf
+                    ) + "ms"
+                  : "計算不可"),
+              "TRUE→写真=" +
+                Math.round(
+                  photoDisplayPerf -
+                  (diagnostic.trueDisplayPerf || trueDisplayPerf)
+                ) + "ms"
             );
 
 
@@ -1277,11 +1267,6 @@ async function load() {
                 imageLoadTime
               ) +
               "ms"
-            );
-
-            console.log(
-              "写真先読み完了済み=" +
-              String(imageAlreadyComplete)
             );
 
 
@@ -1315,13 +1300,16 @@ async function load() {
                このanswerIdだけ送信
             */
 
-            diagnostic.trueToPhotoMs = Math.max(0, diagnostic.photoDisplayMs - diagnostic.trueDisplayMs);
-            diagnostic.imageLoadTimeMs = Math.round(imageLoadTime);
-            diagnostic.loadToPhotoMs = Math.round(totalTime);
-
             sendMonitorTiming(
+
               diagnostic.answerId,
-              diagnostic
+
+              diagnostic.monitorFetchMs,
+
+              diagnostic.trueDisplayMs,
+
+              diagnostic.photoDisplayMs
+
             );
 
 
@@ -1394,7 +1382,9 @@ async function load() {
 
               console.error(
                 "【PHOTOエラー】",
-                imageSrc
+                imageSrc,
+                "画像load開始から=" +
+                  Math.round(performance.now()-imageStart) + "ms"
               );
 
             },
@@ -1440,16 +1430,28 @@ async function load() {
         loadEnd -
         loadStart
       ) +
+      "ms",
+      "fetch開始→完了=" +
+      Math.round(fetchEnd-fetchStart) +
+      "ms",
+      "load開始→JSON完了=" +
+      Math.round(jsonEnd-loadStart) +
       "ms"
     );
 
 
   } catch (error) {
 
-    console.error(
-      "データ取得エラー:",
-      error
-    );
+    if (error && error.name === "AbortError") {
+      console.warn(
+        "【MONITOR】GAS取得が4秒を超えたため今回の取得を中止。次回取得へ。"
+      );
+    } else {
+      console.error(
+        "データ取得エラー:",
+        error
+      );
+    }
 
   }
 

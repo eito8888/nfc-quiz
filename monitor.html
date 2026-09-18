@@ -1129,14 +1129,23 @@ async function load() {
     );
 
 
-  } catch (error) {
+ } catch (error) {
 
-    console.error(
-      "データ取得エラー:",
-      error
+  console.error(
+    "データ取得エラー:",
+    error
+  );
+
+  const displayArea =
+    document.getElementById(
+      "displayArea"
     );
 
+  if (displayArea) {
+    displayArea.innerHTML = "";
   }
+
+} 
 
 }
 

@@ -238,7 +238,7 @@ async function load() {
 
     const res =
       await fetch(
-        GAS_URL,
+        GAS_URL + "?_=" + Date.now(),
         {
           cache: "no-store"
         }
@@ -1135,6 +1135,15 @@ async function load() {
     "データ取得エラー:",
     error
   );
+
+  const displayArea =
+    document.getElementById(
+      "displayArea"
+    );
+
+  if (displayArea) {
+    displayArea.innerHTML = "";
+  }
 
 } 
 

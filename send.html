@@ -938,7 +938,7 @@ function send(){
 
           jsonEndMs:0,
 
-          sentDisplayMs:0,
+          sentDisplayMs,
 
           timeoutMs:
             timeoutWarningMs,
@@ -974,6 +974,25 @@ function send(){
       cache:"no-store"
     }
   )
+
+
+  /* ======================================================
+     「送信しました」を先に表示
+
+     重要：
+     画面表示をGASからのHTTP response待ちに依存させない。
+     fetch開始直後に表示し、通信診断はその後も継続する。
+     ====================================================== */
+
+  const sentDisplayMs =
+    Date.now();
+
+  const sentDisplayElapsed =
+    performance.now() -
+    measureStart;
+
+  msgDiv.innerText =
+    "📩 送信しました！";
 
 
   /* ======================================================
@@ -1137,14 +1156,10 @@ function send(){
         );
 
 
-      /* 送信しました表示 */
-
-      const sentDisplayMs =
-        Date.now();
+      /* 送信しました表示はfetch開始直後に実施済み */
 
       const sendDisplayTime =
-        performance.now() -
-        measureStart;
+        sentDisplayElapsed;
 
 
       /* HTTP response→JSON完了 */
@@ -1221,7 +1236,7 @@ function send(){
 
         "送信開始 →「送信しました」：" +
           Math.round(sendDisplayTime) +
-          " ms",
+          " ms（fetch開始直後に表示）",
 
         "HTTP：" +
           status,
@@ -1521,7 +1536,7 @@ function send(){
 
         jsonEndMs:0,
 
-        sentDisplayMs:0,
+        sentDisplayMs,
 
         timeoutMs:
           timeoutWarningMs,

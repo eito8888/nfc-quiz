@@ -179,37 +179,6 @@ function ms(v){
 }
 
 
-function getPageStartToSendMs(){
-
-  try{
-
-    const nav =
-      performance.getEntriesByType(
-        "navigation"
-      )[0];
-
-    if(
-      nav &&
-      Number.isFinite(nav.startTime)
-    ){
-
-      return Math.max(
-        0,
-        Math.round(
-          performance.now() -
-          nav.startTime
-        )
-      );
-
-    }
-
-  }catch(e){}
-
-  return 0;
-
-}
-
-
 /* ========================================================
    ブラウザ状態
    ======================================================== */
@@ -737,18 +706,6 @@ function send(){
   const sendStartMs =
     Date.now();
 
-  /*
-   * 追加計測（動作ロジックは変更しない）
-   *
-   * NFCでsend.htmlへの遷移が始まってから、
-   * send()が開始するまでのおおよその時間。
-   *
-   * 物理的なNFCタッチ時刻そのものではなく、
-   * このページのnavigation開始を起点にする。
-   */
-  const pageStartToSendMs =
-    getPageStartToSendMs();
-
   const startTime =
     new Date(
       sendStartMs
@@ -761,7 +718,6 @@ function send(){
   console.log(
     "【SEND開始】",
     sendStartMs,
-    pageStartToSendMs,
     player,
     selected,
     sendNumber,
@@ -927,20 +883,21 @@ function send(){
 
 
         /*
-         * スマホ画面表示は現在と同じ。
+         * 15秒警告では「送信しました」を上書きしない。
+         * HTTP応答の診断だけを更新する。
          */
 
-        msgDiv.innerText =
-          "📩 送信確認中…";
+        if(
+          !window.__sendDisplayed
+        ){
+          msgDiv.innerText =
+            "📩 送信確認中…";
+        }
 
 
         showDiagnostic([
 
           "【送信診断】15秒経過（通信は継続中）",
-
-          "ページ開始 → send()開始：" +
-            pageStartToSendMs +
-            " ms",
 
           "送信開始 → 15秒警告：" +
             Math.round(elapsed) +
@@ -992,11 +949,7 @@ function send(){
 
           httpStatus:"",
 
-          diagnosis:
-            diagnosis +
-            " / pageStart→send=" +
-            pageStartToSendMs +
-            "ms",
+          diagnosis,
 
           browserState:bs,
 
@@ -1018,19 +971,60 @@ function send(){
      メインGAS通信
      ====================================================== */
 
-  fetch(
-    url,
-    {
-      method:"GET",
-      cache:"no-store"
-    }
-  )
+  /* ======================================================
+     メインGAS通信を開始
+
+     HTTP応答を待たずに「送信しました」を先に表示する。
+     HTTP応答・JSON解析・answerId取得は、そのまま裏で継続する。
+     ====================================================== */
+
+  const sendPromise =
+    fetch(
+      url,
+      {
+        method:"GET",
+        cache:"no-store"
+      }
+    );
+
+
+  /* ======================================================
+     「送信しました」をHTTP応答から切り離す
+     ====================================================== */
+
+  const sentDisplayMs =
+    Date.now();
+
+  const sendDisplayTime =
+    performance.now() -
+    measureStart;
+
+  window.__sendDisplayed =
+    true;
+
+  window.__sentDisplayMs =
+    sentDisplayMs;
+
+  sessionStorage.setItem(
+    sendKey,
+    "sent"
+  );
+
+  msgDiv.innerText =
+    "📩 送信しました！";
+
+  console.log(
+    "【SEND送信しました表示】",
+    Math.round(sendDisplayTime),
+    "ms"
+  );
 
 
   /* ======================================================
      HTTP response受信
      ====================================================== */
 
+  sendPromise
   .then(
     response => {
 
@@ -1188,14 +1182,12 @@ function send(){
         );
 
 
-      /* 送信しました表示 */
-
-      const sentDisplayMs =
-        Date.now();
+      /* 送信しました表示はfetch開始直後に実施済み */
 
       const sendDisplayTime =
-        performance.now() -
-        measureStart;
+        window.__sentDisplayMs
+          ? window.__sentDisplayMs - sendStartMs
+          : performance.now() - measureStart;
 
 
       /* HTTP response→JSON完了 */
@@ -1270,10 +1262,6 @@ function send(){
           gasOutsideMs +
           " ms",
 
-        "ページ開始 → send()開始：" +
-          pageStartToSendMs +
-          " ms",
-
         "送信開始 →「送信しました」：" +
           Math.round(sendDisplayTime) +
           " ms",
@@ -1307,8 +1295,6 @@ function send(){
         requestId,
 
         sendStartMs,
-
-        pageStartToSendMs,
 
         fetchStartMs,
 
@@ -1410,14 +1396,9 @@ function send(){
             status,
 
           diagnosis:
-            (
-              timeoutFired
-                ? "15秒警告後にHTTP response受信・answerId取得"
-                : "正常"
-            ) +
-            " / pageStart→send=" +
-            pageStartToSendMs +
-            "ms",
+            timeoutFired
+              ? "15秒警告後にHTTP response受信・answerId取得"
+              : "正常",
 
           browserState:
             bs,
@@ -1489,17 +1470,17 @@ function send(){
         getBrowserState();
 
 
-      msgDiv.innerText =
-        "📩 送信確認中";
+      if(
+        !window.__sendDisplayed
+      ){
+        msgDiv.innerText =
+          "📩 送信確認中";
+      }
 
 
       showDiagnostic([
 
         "【送信診断】通信ERROR",
-
-        "ページ開始 → send()開始：" +
-          pageStartToSendMs +
-          " ms",
 
         "送信開始 → ERROR：" +
           Math.round(errorTime) +
@@ -1536,8 +1517,6 @@ function send(){
         requestId,
 
         sendStartMs,
-
-        pageStartToSendMs,
 
         fetchStartMs,
 
@@ -1583,8 +1562,6 @@ function send(){
 
         sendStartMs,
 
-        pageStartToSendMs,
-
         fetchStartMs,
 
         responseMs:0,
@@ -1599,9 +1576,7 @@ function send(){
         httpStatus:"",
 
         diagnosis:
-          "HTTP通信ERROR / pageStart→send=" +
-          pageStartToSendMs +
-          "ms",
+          "HTTP通信ERROR",
 
         browserState:
           bs,

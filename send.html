@@ -883,8 +883,8 @@ function send(){
 
 
         /*
-         * 15秒警告では「送信しました」を上書きしない。
-         * HTTP応答の診断だけを更新する。
+         * 「送信しました」は15秒警告で上書きしない。
+         * メインfetchは継続してHTTP応答を待つ。
          */
 
         if(
@@ -974,8 +974,10 @@ function send(){
   /* ======================================================
      メインGAS通信を開始
 
-     HTTP応答を待たずに「送信しました」を先に表示する。
-     HTTP応答・JSON解析・answerId取得は、そのまま裏で継続する。
+     fetchのHTTP応答を待たず、
+     「送信しました」を先に画面表示する。
+     HTTP応答・JSON解析・answerId取得は
+     そのまま後段で継続する。
      ====================================================== */
 
   const sendPromise =
@@ -983,13 +985,15 @@ function send(){
       url,
       {
         method:"GET",
-        cache:"no-store"
+        cache:"no-store",
+        keepalive:true,
+        priority:"high"
       }
     );
 
 
   /* ======================================================
-     「送信しました」をHTTP応答から切り離す
+     送信表示をHTTP応答から切り離す
      ====================================================== */
 
   const sentDisplayMs =
@@ -1004,11 +1008,6 @@ function send(){
 
   window.__sentDisplayMs =
     sentDisplayMs;
-
-  sessionStorage.setItem(
-    sendKey,
-    "sent"
-  );
 
   msgDiv.innerText =
     "📩 送信しました！";

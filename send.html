@@ -883,16 +883,11 @@ function send(){
 
 
         /*
-         * 「送信しました」は15秒警告で上書きしない。
-         * メインfetchは継続してHTTP応答を待つ。
+         * スマホ画面表示は現在と同じ。
          */
 
-        if(
-          !window.__sendDisplayed
-        ){
-          msgDiv.innerText =
-            "📩 送信確認中…";
-        }
+        msgDiv.innerText =
+          "📩 送信確認中…";
 
 
         showDiagnostic([
@@ -971,59 +966,21 @@ function send(){
      メインGAS通信
      ====================================================== */
 
-  /* ======================================================
-     メインGAS通信を開始
-
-     fetchのHTTP応答を待たず、
-     「送信しました」を先に画面表示する。
-     HTTP応答・JSON解析・answerId取得は
-     そのまま後段で継続する。
-     ====================================================== */
-
-  const sendPromise =
-    fetch(
-      url,
-      {
-        method:"GET",
-        cache:"no-store",
-        keepalive:true,
-        priority:"high"
-      }
-    );
-
-
-  /* ======================================================
-     送信表示をHTTP応答から切り離す
-     ====================================================== */
-
-  const sentDisplayMs =
-    Date.now();
-
-  const sendDisplayTime =
-    performance.now() -
-    measureStart;
-
-  window.__sendDisplayed =
-    true;
-
-  window.__sentDisplayMs =
-    sentDisplayMs;
-
-  msgDiv.innerText =
-    "📩 送信しました！";
-
-  console.log(
-    "【SEND送信しました表示】",
-    Math.round(sendDisplayTime),
-    "ms"
-  );
+  fetch(
+    url,
+    {
+      method:"GET",
+      cache:"no-store",
+      keepalive:true,
+      priority:"high"
+    }
+  )
 
 
   /* ======================================================
      HTTP response受信
      ====================================================== */
 
-  sendPromise
   .then(
     response => {
 
@@ -1181,12 +1138,14 @@ function send(){
         );
 
 
-      /* 送信しました表示はfetch開始直後に実施済み */
+      /* 送信しました表示 */
+
+      const sentDisplayMs =
+        Date.now();
 
       const sendDisplayTime =
-        window.__sentDisplayMs
-          ? window.__sentDisplayMs - sendStartMs
-          : performance.now() - measureStart;
+        performance.now() -
+        measureStart;
 
 
       /* HTTP response→JSON完了 */
@@ -1469,12 +1428,8 @@ function send(){
         getBrowserState();
 
 
-      if(
-        !window.__sendDisplayed
-      ){
-        msgDiv.innerText =
-          "📩 送信確認中";
-      }
+      msgDiv.innerText =
+        "📩 送信確認中";
 
 
       showDiagnostic([

@@ -496,6 +496,119 @@ function resourceLines(rt){
 
 
 /* ========================================================
+   通信5分類
+
+   ① 端末/Safari/OS
+   ② ネットワーク/HTTP応答経路
+   ③ Google Web App/GAS
+   正常
+   ①または②（ブラウザだけでは完全分離できない場合）
+   ======================================================== */
+
+function classifyCommunication(d){
+
+  const sendStartMs = Number(d.sendStartMs) || 0;
+  const fetchStartMs = Number(d.fetchStartMs) || 0;
+  const responseMs = Number(d.responseMs) || 0;
+  const gasReceiveMs = Number(d.gasReceiveMs) || 0;
+  const gasCompleteMs = Number(d.gasCompleteMs) || 0;
+  const gasResponseReadyMs = Number(d.gasResponseReadyMs) || 0;
+  const rt = d.resourceTiming || null;
+
+  const GAS_LIMIT = 2000;
+  const COMM_LIMIT = 5000;
+  const BROWSER_POST_RESPONSE_LIMIT = 2000;
+
+  if (!responseMs) {
+    return "①または②：端末/Safari/OS またはネットワーク";
+  }
+
+  if (gasReceiveMs && gasResponseReadyMs) {
+    const gasTime =
+      gasResponseReadyMs - gasReceiveMs;
+
+    if (gasTime > GAS_LIMIT) {
+      return "③：Google Web App/GAS";
+    }
+  } else if (gasReceiveMs && gasCompleteMs) {
+    const gasTime =
+      gasCompleteMs - gasReceiveMs;
+
+    if (gasTime > GAS_LIMIT) {
+      return "③：Google Web App/GAS";
+    }
+  }
+
+  const fetchElapsed =
+    fetchStartMs
+      ? responseMs - fetchStartMs
+      : 0;
+
+  let resourceResponseElapsed = 0;
+
+  if (
+    rt &&
+    Number.isFinite(rt.responseStart) &&
+    rt.responseStart > 0
+  ) {
+    const resourceBase =
+      Number.isFinite(rt.fetchStart) && rt.fetchStart > 0
+        ? rt.fetchStart
+        : rt.startTime;
+
+    if (Number.isFinite(resourceBase)) {
+      resourceResponseElapsed =
+        rt.responseStart - resourceBase;
+    }
+  }
+
+  if (
+    fetchElapsed > 0 &&
+    resourceResponseElapsed > 0
+  ) {
+    const browserPostResponseMs =
+      fetchElapsed - resourceResponseElapsed;
+
+    if (
+      resourceResponseElapsed > COMM_LIMIT &&
+      browserPostResponseMs <= BROWSER_POST_RESPONSE_LIMIT
+    ) {
+      return "②：ネットワーク/HTTP応答経路";
+    }
+
+    if (
+      resourceResponseElapsed <= COMM_LIMIT &&
+      browserPostResponseMs > COMM_LIMIT
+    ) {
+      return "①：端末/Safari/OS";
+    }
+
+    if (
+      resourceResponseElapsed > BROWSER_POST_RESPONSE_LIMIT &&
+      browserPostResponseMs > BROWSER_POST_RESPONSE_LIMIT
+    ) {
+      return "①または②：端末/Safari/OS またはネットワーク";
+    }
+  }
+
+  if (
+    gasResponseReadyMs &&
+    responseMs - gasResponseReadyMs > COMM_LIMIT
+  ) {
+    return "①または②：端末/Safari/OS またはネットワーク";
+  }
+
+  if (
+    fetchElapsed > COMM_LIMIT
+  ) {
+    return "①または②：端末/Safari/OS またはネットワーク";
+  }
+
+  return "正常";
+}
+
+
+/* ========================================================
    clientTiming送信
 
    メインの送信fetchとは完全に別処理。
@@ -553,6 +666,26 @@ function sendClientTiming(d){
     p.set(
       "jsonEndMs",
       d.jsonEndMs || ""
+    );
+
+    p.set(
+      "gasReceiveMs",
+      d.gasReceiveMs || ""
+    );
+
+    p.set(
+      "gasCompleteMs",
+      d.gasCompleteMs || ""
+    );
+
+    p.set(
+      "gasResponseReadyMs",
+      d.gasResponseReadyMs || ""
+    );
+
+    p.set(
+      "communicationClass",
+      d.communicationClass || ""
     );
 
     p.set(
@@ -946,6 +1079,9 @@ function send(){
 
           diagnosis,
 
+          communicationClass:
+            "①または②：端末/Safari/OS またはネットワーク",
+
           browserState:bs,
 
           resourceTiming:rt,
@@ -970,9 +1106,7 @@ function send(){
     url,
     {
       method:"GET",
-      cache:"no-store",
-      keepalive:true,
-      priority:"high"
+      cache:"no-store"
     }
   )
 
@@ -1066,6 +1200,12 @@ function send(){
       const gasCompleteMs =
         Number(
           data.gasCompleteMs
+        ) || 0;
+
+
+      const gasResponseReadyMs =
+        Number(
+          data.gasResponseReadyMs
         ) || 0;
 
 
@@ -1177,6 +1317,19 @@ function send(){
         window.__sendResponseStatus;
 
 
+      const communicationClass =
+        classifyCommunication({
+          sendStartMs,
+          fetchStartMs,
+          responseMs:
+            window.__sendResponseMs || 0,
+          gasReceiveMs,
+          gasCompleteMs,
+          gasResponseReadyMs,
+          resourceTiming: rt
+        });
+
+
       /* ==================================================
          正常表示
          ================================================== */
@@ -1226,6 +1379,9 @@ function send(){
 
         "HTTP：" +
           status,
+
+        "【通信5分類】" +
+          communicationClass,
 
         "JSON解析：" +
           jsonParseMs +
@@ -1293,6 +1449,10 @@ function send(){
 
         gasCompleteToResponseMs,
 
+        gasResponseReadyMs,
+
+        communicationClass,
+
         gasOutsideMs,
 
         sendToDisplayMs:
@@ -1344,6 +1504,14 @@ function send(){
             0,
 
           jsonEndMs,
+
+          gasReceiveMs,
+
+          gasCompleteMs,
+
+          gasResponseReadyMs,
+
+          communicationClass,
 
           sentDisplayMs,
 
@@ -1531,6 +1699,9 @@ function send(){
 
         diagnosis:
           "HTTP通信ERROR",
+
+        communicationClass:
+          "①または②：端末/Safari/OS またはネットワーク",
 
         browserState:
           bs,

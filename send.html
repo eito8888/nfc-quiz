@@ -555,74 +555,6 @@ function classifyCommunication(d){
   return "正常";
 }
 
-function communicationClassCode(value){
-
-  const v = String(value || "");
-
-  if(v.indexOf("③") >= 0){
-    return "GAS";
-  }
-
-  if(v.indexOf("②：") >= 0){
-    return "NETWORK";
-  }
-
-  if(v.indexOf("①：") >= 0){
-    return "DEVICE";
-  }
-
-  if(v.indexOf("①または②") >= 0){
-    return "DEVICE_OR_NETWORK";
-  }
-
-  return "NORMAL";
-}
-
-
-function diagnosisCode(value){
-
-  const v = String(value || "");
-
-  if(v === "正常"){
-    return "NORMAL";
-  }
-
-  if(v.indexOf("HTTP response開始") >= 0){
-    return "RESPONSE_STARTED";
-  }
-
-  if(v.indexOf("request開始済み") >= 0){
-    return "REQUEST_STARTED_RESPONSE_WAIT";
-  }
-
-  if(v.indexOf("接続開始済み") >= 0){
-    return "CONNECT_STARTED";
-  }
-
-  if(v.indexOf("fetch開始済み") >= 0){
-    return "FETCH_STARTED";
-  }
-
-  if(v.indexOf("navigator.onLine=false") >= 0){
-    return "OFFLINE";
-  }
-
-  if(v.indexOf("HTTP response未受信") >= 0){
-    return "NO_HTTP_RESPONSE";
-  }
-
-  if(v.indexOf("HTTP通信ERROR") >= 0){
-    return "HTTP_ERROR";
-  }
-
-  if(v.indexOf("15秒") >= 0){
-    return "TIMEOUT_15S";
-  }
-
-  return "OTHER";
-}
-
-
 /* ========================================================
    clientTiming送信
 
@@ -653,13 +585,6 @@ function sendClientTiming(d){
       "requestId",
       d.requestId || requestId
     );
-
-    // answerId未取得の15秒/通信ERRORでも、GAS側で
-    // timing_logに仮行を作れるよう回答情報を送る。
-    p.set("player", player || "");
-    p.set("selected", selected || "");
-    p.set("number", sendNumber || "");
-    p.set("tagStage", tagStage || "");
 
     if(d.answerId){
 
@@ -705,13 +630,9 @@ function sendClientTiming(d){
       d.gasResponseReadyMs || ""
     );
 
-    // 日本語ラベルは通信経路に流さず、ASCIIコードだけを送る。
-    // Safari/Sheets側の文字コード問題で診断値が文字化けするのを防ぐ。
     p.set(
-      "communicationClassCode",
-      communicationClassCode(
-        d.communicationClass
-      )
+      "communicationClass",
+      d.communicationClass || ""
     );
 
     p.set(
@@ -763,10 +684,8 @@ function sendClientTiming(d){
     );
 
     p.set(
-      "diagnosisCode",
-      diagnosisCode(
-        d.diagnosis
-      )
+      "diagnosis",
+      d.diagnosis || ""
     );
 
     p.set(

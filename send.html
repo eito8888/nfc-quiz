@@ -742,25 +742,50 @@ function sendClientTiming(d){
     }
 
 
-    fetch(
+    const diagnosticUrl =
       GAS_URL +
       "?" +
       p.toString() +
       "&_=" +
-      Date.now(),
-      {
-        method:"GET",
-        cache:"no-store",
-        keepalive:true
+      Date.now();
+
+    /*
+       診断通信はメイン回答通信と競合させない。
+       特に15秒警告中に通常fetchを追加すると、
+       Safariの同一通信先への待ちが重なる可能性がある。
+       まずBeaconでfire-and-forget送信し、
+       Beacon非対応/受付不可の場合だけkeepalive fetchへ。
+    */
+    let beaconSent = false;
+
+    try {
+      if (navigator.sendBeacon) {
+        beaconSent =
+          navigator.sendBeacon(
+            diagnosticUrl,
+            new Blob([""], { type:"text/plain" })
+          );
       }
-    )
-    .catch(
-      e =>
-        console.error(
-          "【SEND clientTiming送信エラー】",
-          e
-        )
-    );
+    } catch(e) {
+      beaconSent = false;
+    }
+
+    if (!beaconSent) {
+      fetch(
+        diagnosticUrl,
+        {
+          method:"GET",
+          cache:"no-store",
+          keepalive:true
+        }
+      ).catch(
+        e =>
+          console.error(
+            "【SEND clientTiming送信エラー】",
+            e
+          )
+      );
+    }
 
   }catch(e){
 
@@ -1055,7 +1080,9 @@ function send(){
     url,
     {
       method:"GET",
-      cache:"no-store"
+      cache:"no-store",
+      keepalive:true,
+      priority:"high"
     }
   )
 

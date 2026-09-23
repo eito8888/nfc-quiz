@@ -291,109 +291,77 @@ function browserLines(s){
    のGAS通信も候補にする。
    ======================================================== */
 
-function getResourceTiming(target){
+function getResourceTiming(targetUrl, requestId, fetchStartPerf){
 
   try{
 
     const entries =
-      performance.getEntriesByType(
-        "resource"
-      );
+      performance.getEntriesByType("resource");
 
-    const list =
-      entries.filter(e => {
-
-        const name =
-          String(e.name || "");
-
-        return (
-          name.indexOf(target) === 0 ||
-          name.indexOf(
-            "https://script.google.com/"
-          ) === 0 ||
-          name.indexOf(
-            "https://script.googleusercontent.com/"
-          ) === 0
-        );
-
-      });
-
-    if(!list.length){
-
+    if(!entries || !entries.length){
       return null;
-
     }
 
-    list.sort(
-      (a,b) =>
-        b.startTime - a.startTime
+    const exact = entries.filter(e =>
+      String(e.name || "") === String(targetUrl || "")
     );
 
-    const e =
-      list[0];
+    let list = exact;
+
+    if(!list.length && requestId){
+      list = entries.filter(e => {
+        const name = String(e.name || "");
+        return (
+          name.indexOf("https://script.google.com/") === 0 ||
+          name.indexOf("https://script.googleusercontent.com/") === 0
+        ) && name.indexOf(String(requestId)) >= 0;
+      });
+    }
+
+    if(!list.length){
+      list = entries.filter(e => {
+        const name = String(e.name || "");
+        return (
+          name.indexOf("https://script.google.com/") === 0 ||
+          name.indexOf("https://script.googleusercontent.com/") === 0
+        );
+      });
+    }
+
+    if(!list.length){
+      return null;
+    }
+
+    if(typeof fetchStartPerf === "number" && Number.isFinite(fetchStartPerf)){
+      list.sort((a,b) =>
+        Math.abs((a.startTime || 0) - fetchStartPerf) -
+        Math.abs((b.startTime || 0) - fetchStartPerf)
+      );
+    }else{
+      list.sort((a,b) => (b.startTime || 0) - (a.startTime || 0));
+    }
+
+    const e = list[0];
 
     return {
-
-      name:
-        e.name || "",
-
-      startTime:
-        e.startTime,
-
-      duration:
-        e.duration,
-
-      redirectStart:
-        e.redirectStart,
-
-      redirectEnd:
-        e.redirectEnd,
-
-      workerStart:
-        e.workerStart,
-
-      fetchStart:
-        e.fetchStart,
-
-      domainLookupStart:
-        e.domainLookupStart,
-
-      domainLookupEnd:
-        e.domainLookupEnd,
-
-      connectStart:
-        e.connectStart,
-
-      connectEnd:
-        e.connectEnd,
-
-      secureConnectionStart:
-        e.secureConnectionStart,
-
-      requestStart:
-        e.requestStart,
-
-      responseStart:
-        e.responseStart,
-
-      responseEnd:
-        e.responseEnd,
-
-      transferSize:
-        e.transferSize,
-
-      encodedBodySize:
-        e.encodedBodySize,
-
-      decodedBodySize:
-        e.decodedBodySize,
-
-      nextHopProtocol:
-        e.nextHopProtocol || "",
-
-      initiatorType:
-        e.initiatorType || ""
-
+      name: e.name || "",
+      startTime: e.startTime,
+      duration: e.duration,
+      redirectStart: e.redirectStart,
+      redirectEnd: e.redirectEnd,
+      workerStart: e.workerStart,
+      fetchStart: e.fetchStart,
+      domainLookupStart: e.domainLookupStart,
+      domainLookupEnd: e.domainLookupEnd,
+      connectStart: e.connectStart,
+      connectEnd: e.connectEnd,
+      secureConnectionStart: e.secureConnectionStart,
+      requestStart: e.requestStart,
+      responseStart: e.responseStart,
+      responseEnd: e.responseEnd,
+      transferSize: e.transferSize,
+      nextHopProtocol: e.nextHopProtocol,
+      initiatorType: e.initiatorType
     };
 
   }catch(e){
@@ -401,9 +369,7 @@ function getResourceTiming(target){
     return null;
 
   }
-
 }
-
 
 function resourceLines(rt){
 
@@ -507,7 +473,6 @@ function resourceLines(rt){
 
 function classifyCommunication(d){
 
-  const sendStartMs = Number(d.sendStartMs) || 0;
   const fetchStartMs = Number(d.fetchStartMs) || 0;
   const responseMs = Number(d.responseMs) || 0;
   const gasReceiveMs = Number(d.gasReceiveMs) || 0;
@@ -516,27 +481,22 @@ function classifyCommunication(d){
   const rt = d.resourceTiming || null;
 
   const GAS_LIMIT = 2000;
-  const COMM_LIMIT = 5000;
-  const BROWSER_POST_RESPONSE_LIMIT = 2000;
+  const SLOW_LIMIT = 5000;
+  const POST_RESPONSE_LIMIT = 2000;
 
-  if (!responseMs) {
+  if(!responseMs){
     return "①または②：端末/Safari/OS またはネットワーク";
   }
 
-  if (gasReceiveMs && gasResponseReadyMs) {
-    const gasTime =
-      gasResponseReadyMs - gasReceiveMs;
+  const gasTime =
+    gasReceiveMs && gasResponseReadyMs
+      ? gasResponseReadyMs - gasReceiveMs
+      : (gasReceiveMs && gasCompleteMs
+          ? gasCompleteMs - gasReceiveMs
+          : 0);
 
-    if (gasTime > GAS_LIMIT) {
-      return "③：Google Web App/GAS";
-    }
-  } else if (gasReceiveMs && gasCompleteMs) {
-    const gasTime =
-      gasCompleteMs - gasReceiveMs;
-
-    if (gasTime > GAS_LIMIT) {
-      return "③：Google Web App/GAS";
-    }
+  if(gasTime > GAS_LIMIT){
+    return "③：Google Web App/GAS";
   }
 
   const fetchElapsed =
@@ -545,68 +505,55 @@ function classifyCommunication(d){
       : 0;
 
   let resourceResponseElapsed = 0;
+  let resourceValid = false;
 
-  if (
-    rt &&
-    Number.isFinite(rt.responseStart) &&
-    rt.responseStart > 0
-  ) {
-    const resourceBase =
-      Number.isFinite(rt.fetchStart) && rt.fetchStart > 0
-        ? rt.fetchStart
-        : rt.startTime;
-
-    if (Number.isFinite(resourceBase)) {
-      resourceResponseElapsed =
-        rt.responseStart - resourceBase;
-    }
+  if(rt && Number.isFinite(rt.responseStart) && Number.isFinite(rt.startTime)){
+    resourceResponseElapsed = rt.responseStart - rt.startTime;
+    resourceValid =
+      resourceResponseElapsed >= 0 &&
+      fetchElapsed > 0 &&
+      resourceResponseElapsed <= fetchElapsed + 2000;
   }
 
-  if (
-    fetchElapsed > 0 &&
-    resourceResponseElapsed > 0
-  ) {
+  if(resourceValid){
     const browserPostResponseMs =
       fetchElapsed - resourceResponseElapsed;
 
-    if (
-      resourceResponseElapsed > COMM_LIMIT &&
-      browserPostResponseMs <= BROWSER_POST_RESPONSE_LIMIT
-    ) {
+    if(
+      resourceResponseElapsed > SLOW_LIMIT &&
+      browserPostResponseMs <= POST_RESPONSE_LIMIT
+    ){
       return "②：ネットワーク/HTTP応答経路";
     }
 
-    if (
-      resourceResponseElapsed <= COMM_LIMIT &&
-      browserPostResponseMs > COMM_LIMIT
-    ) {
+    if(
+      resourceResponseElapsed <= POST_RESPONSE_LIMIT &&
+      browserPostResponseMs > SLOW_LIMIT
+    ){
       return "①：端末/Safari/OS";
     }
 
-    if (
-      resourceResponseElapsed > BROWSER_POST_RESPONSE_LIMIT &&
-      browserPostResponseMs > BROWSER_POST_RESPONSE_LIMIT
-    ) {
+    if(
+      resourceResponseElapsed > POST_RESPONSE_LIMIT &&
+      browserPostResponseMs > POST_RESPONSE_LIMIT
+    ){
       return "①または②：端末/Safari/OS またはネットワーク";
     }
   }
 
-  if (
+  if(
     gasResponseReadyMs &&
-    responseMs - gasResponseReadyMs > COMM_LIMIT
-  ) {
+    responseMs - gasResponseReadyMs > SLOW_LIMIT
+  ){
     return "①または②：端末/Safari/OS またはネットワーク";
   }
 
-  if (
-    fetchElapsed > COMM_LIMIT
-  ) {
+  if(fetchElapsed > SLOW_LIMIT){
     return "①または②：端末/Safari/OS またはネットワーク";
   }
 
   return "正常";
 }
-
 
 /* ========================================================
    clientTiming送信
@@ -957,7 +904,9 @@ function send(){
 
         const rt =
           getResourceTiming(
-            GAS_URL
+            url,
+            requestId,
+            fetchStart
           );
 
         const bs =
@@ -1305,7 +1254,9 @@ function send(){
 
       const rt =
         getResourceTiming(
-          GAS_URL
+          url,
+          requestId,
+          fetchStart
         );
 
 
@@ -1489,6 +1440,8 @@ function send(){
 
       if(answerId){
 
+        // 診断送信はメイン送信の完了後に別fetchで行う。
+        // メインGAS通信を待たせない。
         sendClientTiming({
 
           requestId,
@@ -1588,7 +1541,9 @@ function send(){
 
       const rt =
         getResourceTiming(
-          GAS_URL
+          url,
+          requestId,
+          fetchStart
         );
 
 

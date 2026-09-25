@@ -73,6 +73,16 @@ const tagStage =
 const sendNumber =
   number || dog;
 
+const sendKey =
+  "sending_" +
+  String(player || "") +
+  "_" +
+  String(selected || "") +
+  "_" +
+  String(sendNumber || "") +
+  "_" +
+  String(tagStage || "");
+
 const requestId =
   (crypto && crypto.randomUUID)
     ? crypto.randomUUID()
@@ -82,10 +92,6 @@ const requestId =
         "_" +
         Math.random().toString(36).slice(2)
       );
-
-const sendKey =
-  "sending_" +
-  requestId;
 
 let timeoutWarningMs = 0;
 
@@ -549,30 +555,6 @@ function classifyCommunication(d){
   return "正常";
 }
 
-function communicationClassCode(value){
-
-  const v = String(value || "");
-
-  if(v.indexOf("③") >= 0){
-    return "GAS";
-  }
-
-  if(v.indexOf("②：") >= 0){
-    return "NETWORK";
-  }
-
-  if(v.indexOf("①：") >= 0){
-    return "DEVICE";
-  }
-
-  if(v.indexOf("①または②") >= 0){
-    return "DEVICE_OR_NETWORK";
-  }
-
-  return "NORMAL";
-}
-
-
 /* ========================================================
    clientTiming送信
 
@@ -649,8 +631,8 @@ function sendClientTiming(d){
     );
 
     p.set(
-      "communicationClassCode",
-      communicationClassCode(d.communicationClass)
+      "communicationClass",
+      d.communicationClass || ""
     );
 
     p.set(
@@ -760,25 +742,50 @@ function sendClientTiming(d){
     }
 
 
-    fetch(
+    const diagnosticUrl =
       GAS_URL +
       "?" +
       p.toString() +
       "&_=" +
-      Date.now(),
-      {
-        method:"GET",
-        cache:"no-store",
-        keepalive:true
+      Date.now();
+
+    /*
+       診断通信はメイン回答通信と競合させない。
+       特に15秒警告中に通常fetchを追加すると、
+       Safariの同一通信先への待ちが重なる可能性がある。
+       まずBeaconでfire-and-forget送信し、
+       Beacon非対応/受付不可の場合だけkeepalive fetchへ。
+    */
+    let beaconSent = false;
+
+    try {
+      if (navigator.sendBeacon) {
+        beaconSent =
+          navigator.sendBeacon(
+            diagnosticUrl,
+            new Blob([""], { type:"text/plain" })
+          );
       }
-    )
-    .catch(
-      e =>
-        console.error(
-          "【SEND clientTiming送信エラー】",
-          e
-        )
-    );
+    } catch(e) {
+      beaconSent = false;
+    }
+
+    if (!beaconSent) {
+      fetch(
+        diagnosticUrl,
+        {
+          method:"GET",
+          cache:"no-store",
+          keepalive:true
+        }
+      ).catch(
+        e =>
+          console.error(
+            "【SEND clientTiming送信エラー】",
+            e
+          )
+      );
+    }
 
   }catch(e){
 

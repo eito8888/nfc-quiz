@@ -894,6 +894,36 @@ function send(){
   let timeoutFired =
     false;
 
+  /*
+   * 5秒ショック療法
+   *
+   * 通常の通信は従来どおり1本だけ。
+   * 5秒経過してもHTTP responseが来ない場合だけ、
+   * 同じrequestIdで1回だけ再通信する。
+   */
+  let retryFired =
+    false;
+
+  let retryStartMs =
+    0;
+
+  let retryTimerId =
+    0;
+
+  const retryUrl =
+    url +
+    `&retry=1` +
+    `&_retry=${Date.now()}`;
+
+  window.__sendResponseRoute =
+    "";
+
+  window.__sendActiveFetchStart =
+    fetchStart;
+
+  window.__sendActiveUrl =
+    url;
+
 
   /* ======================================================
      15秒警告
@@ -922,9 +952,9 @@ function send(){
 
         const rt =
           getResourceTiming(
-            url,
+            window.__sendActiveUrl || url,
             requestId,
-            fetchStart
+            window.__sendActiveFetchStart || fetchStart
           );
 
         const bs =
@@ -1007,6 +1037,13 @@ function send(){
 
           "HTTP response：まだ受信していません",
 
+          "5秒再通信：" +
+            (
+              retryFired
+                ? "実行済み"
+                : "未実行"
+            ),
+
           "answerId：まだ取得していません",
 
           "【今回の重要判定】" +
@@ -1069,13 +1106,111 @@ function send(){
      メインGAS通信
      ====================================================== */
 
-  fetch(
-    url,
-    {
-      method:"GET",
-      cache:"no-store"
-    }
-  )
+  /*
+   * 通常のメイン通信
+   */
+  const primaryFetch =
+    fetch(
+      url,
+      {
+        method:"GET",
+        cache:"no-store"
+      }
+    ).then(
+      response => ({
+        response,
+        route:"primary",
+        fetchStartPerf:fetchStart,
+        targetUrl:url
+      })
+    );
+
+
+  /*
+   * 5秒ショック療法。
+   *
+   * 5秒以内にprimaryFetchが返れば、この再通信は発生しない。
+   * 5秒を超えた場合だけ、同じrequestIdで1回だけ再通信する。
+   *
+   * retry側で通信エラーになっても、primary側が後から返る可能性を残す。
+   */
+  const retryFetch =
+    new Promise(
+      resolve => {
+
+        retryTimerId =
+          setTimeout(
+            () => {
+
+              retryFired =
+                true;
+
+              retryStartMs =
+                Date.now();
+
+              const retryFetchStart =
+                performance.now();
+
+
+              console.log(
+                "【5秒ショック療法】再通信開始",
+                retryStartMs,
+                requestId
+              );
+
+
+              fetch(
+                retryUrl,
+                {
+                  method:"GET",
+                  cache:"no-store"
+                }
+              )
+              .then(
+                response => {
+
+                  resolve({
+
+                    response,
+
+                    route:"retry",
+
+                    fetchStartPerf:
+                      retryFetchStart,
+
+                    targetUrl:
+                      retryUrl
+
+                  });
+
+                }
+              )
+              .catch(
+                error => {
+
+                  console.log(
+                    "【5秒ショック療法】再通信ERROR",
+                    error
+                  );
+
+                }
+              );
+
+            },
+            5000
+          );
+
+      }
+    );
+
+
+  /*
+   * 先にresponseを返した通信を採用する。
+   */
+  Promise.race([
+    primaryFetch,
+    retryFetch
+  ])
 
 
   /* ======================================================
@@ -1083,7 +1218,20 @@ function send(){
      ====================================================== */
 
   .then(
-    response => {
+    packet => {
+
+      const response =
+        packet.response;
+
+      window.__sendResponseRoute =
+        packet.route;
+
+      window.__sendActiveFetchStart =
+        packet.fetchStartPerf;
+
+      window.__sendActiveUrl =
+        packet.targetUrl;
+
 
       const responseMs =
         Date.now();
@@ -1105,6 +1253,10 @@ function send(){
 
       clearTimeout(
         timeoutId
+      );
+
+      clearTimeout(
+        retryTimerId
       );
 
 
@@ -1272,9 +1424,9 @@ function send(){
 
       const rt =
         getResourceTiming(
-          url,
+          window.__sendActiveUrl || url,
           requestId,
-          fetchStart
+          window.__sendActiveFetchStart || fetchStart
         );
 
 
@@ -1348,6 +1500,17 @@ function send(){
 
         "HTTP：" +
           status,
+
+        "5秒再通信：" +
+          (
+            retryFired
+              ? (
+                  window.__sendResponseRoute === "retry"
+                    ? "実行・再通信側でresponse受信"
+                    : "実行・先行通信側でresponse受信"
+                )
+              : "未実行"
+          ),
 
         "【通信5分類】" +
           communicationClass,
@@ -1434,6 +1597,13 @@ function send(){
 
         jsonParseMs,
 
+        retryFired,
+
+        retryStartMs,
+
+        responseRoute:
+          window.__sendResponseRoute,
+
         browserState:
           bs,
 
@@ -1493,9 +1663,17 @@ function send(){
             status,
 
           diagnosis:
-            timeoutFired
-              ? "15秒警告後にHTTP response受信・answerId取得"
-              : "正常",
+            retryFired
+              ? (
+                  window.__sendResponseRoute === "retry"
+                    ? "5秒再通信後にHTTP response受信・answerId取得"
+                    : "5秒再通信実行後に先行通信のHTTP response受信"
+                )
+              : (
+                  timeoutFired
+                    ? "15秒警告後にHTTP response受信・answerId取得"
+                    : "正常"
+                ),
 
           browserState:
             bs,
@@ -1541,6 +1719,10 @@ function send(){
         timeoutId
       );
 
+      clearTimeout(
+        retryTimerId
+      );
+
 
       const errorTime =
         performance.now() -
@@ -1559,9 +1741,9 @@ function send(){
 
       const rt =
         getResourceTiming(
-          url,
+          window.__sendActiveUrl || url,
           requestId,
-          fetchStart
+          window.__sendActiveFetchStart || fetchStart
         );
 
 
@@ -1593,6 +1775,13 @@ function send(){
           ),
 
         "answerId：取得できず",
+
+        "5秒再通信：" +
+          (
+            retryFired
+              ? "実行済み"
+              : "未実行"
+          ),
 
         ...browserLines(bs),
 

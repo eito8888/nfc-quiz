@@ -1020,18 +1020,44 @@ function send(){
 
 
         /*
-         * 重要：15秒時点では診断用の追加fetchを送らない。
+         * 15秒時点の診断をGASへ送る。
          *
-         * メイン回答fetchがまだHTTP response待ちの最中に
-         * 別のGAS通信を開始すると、同じ端末/ネットワーク上で
-         * 通信競合を起こし、長時間化を悪化させる可能性がある。
-         *
-         * 15秒時点の情報は timeoutFired / timeoutWarningMs として保持し、
-         * メインfetch完了後の既存clientTiming送信にまとめて記録する。
-         *
-         * これにより正常時の通信経路は変更せず、
-         * 長時間通信時だけ追加通信を発生させない。
+         * ここでもメインfetchは待たない。
          */
+
+        sendClientTiming({
+
+          requestId,
+
+          sendStartMs,
+
+          fetchStartMs,
+
+          responseMs:0,
+
+          jsonEndMs:0,
+
+          sentDisplayMs:0,
+
+          timeoutMs:
+            timeoutWarningMs,
+
+          httpStatus:"",
+
+          diagnosis,
+
+          communicationClass:
+            "①または②：端末/Safari/OS またはネットワーク",
+
+          browserState:bs,
+
+          resourceTiming:rt,
+
+          errorName:"",
+
+          errorMessage:""
+
+        });
 
 
       },

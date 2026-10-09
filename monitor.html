@@ -480,9 +480,7 @@ async function load() {
       );
       return;
     }
-
-    lastRenderSignature = renderSignature;
-
+    /* 署名は実際の画面反映が成功した後に保存する */
 
     /* =====================================================
        Stage = 0
@@ -508,6 +506,8 @@ async function load() {
              <h2>まだ回答データがありません</h2>
            </div>`;
 
+
+         lastRenderSignature = renderSignature;
         return;
       }
 
@@ -567,8 +567,9 @@ async function load() {
         </div>
       `;
 
+      lastRenderSignature = renderSignature;
 
-      return;
+            return;
     }
 
 
@@ -1013,6 +1014,8 @@ async function load() {
       .innerText =
         stageTitle;
 
+     lastRenderSignature = renderSignature;
+
 
     const renderEnd =
       performance.now();
@@ -1444,10 +1447,9 @@ async function load() {
       Math.round(jsonEnd-loadStart) +
       "ms"
     );
-
-
   } catch (error) {
 
+    lastRenderSignature = ""; // 描画途中の失敗を次回loadで再試行
     if (error && error.name === "AbortError") {
       console.warn(
         "【MONITOR】GAS取得が4秒を超えたため今回の取得を中止。次回取得へ。"

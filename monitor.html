@@ -14,9 +14,19 @@ body {
 }
 
 h1 {
-  margin: 20px 0;
+  margin: 20px 0 8px;
   font-size: 36px;
   color: #333;
+}
+
+/* 原因追及用：画面を大きく邪魔しない通信状況表示 */
+#monitorStatus {
+  margin: 0 auto 10px;
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #555;
+  overflow-wrap: anywhere;
 }
 
 .grid {
@@ -109,6 +119,7 @@ img {
 <body>
 
 <h1 id="mainTitle">クイズ</h1>
+<div id="monitorStatus" role="status">起動中：GASからデータを取得しています</div>
 
 <div id="displayArea"></div>
 
@@ -298,10 +309,28 @@ function sendMonitorTiming(
 
 
 /* =========================================================
+   起動・通信・描画の原因追及
+   ========================================================= */
+
+const monitorPageStartMs = Date.now();
+let monitorAttemptCount = 0;
+let monitorTimeoutCount = 0;
+let monitorErrorCount = 0;
+let monitorLastSuccessfulStage = null;
+
+function setMonitorStatus(message, color = "#555") {
+  const el = document.getElementById("monitorStatus");
+  if (!el) return;
+  el.textContent = message;
+  el.style.color = color;
+}
+
+/* =========================================================
    メイン処理
    ========================================================= */
 
 async function load() {
+  monitorAttemptCount++;
 
   const loadStart =
     performance.now();
@@ -318,15 +347,15 @@ async function load() {
 
 
     /*
-       Monitor取得が長時間止まると、
-       次の回答確認まで一緒に止まってしまう。
-       4秒で今回の取得だけ中止し、次の周期で再取得する。
+       旧版の4秒打ち切りでは、4秒を少し超えて返る通信まで
+       毎回中止してしまう。短時間の遅延と通信失敗を区別するため、
+       取得上限を9秒にする。成功時は通信・JSON・描画時間を画面に表示。
     */
     const controller =
       new AbortController();
 
     const timeoutId =
-      setTimeout(() => controller.abort(), 4000);
+      setTimeout(() => controller.abort(), 9000);
 
     const requestUrl =
       GAS_URL + "?_=" + Date.now();
@@ -420,6 +449,13 @@ async function load() {
         data.currentStage
       );
 
+    const stageTransitionText =
+      monitorLastSuccessfulStage === null
+        ? "初回データ取得"
+        : (monitorLastSuccessfulStage !== currentStage
+            ? "ステージ切換 " + monitorLastSuccessfulStage + "→" + currentStage
+            : "ステージ変更なし");
+    monitorLastSuccessfulStage = currentStage;
 
     /* -----------------------------------------
        写真先読み
@@ -477,6 +513,16 @@ async function load() {
     if (renderSignature === lastRenderSignature) {
       console.log(
         "【MONITOR】画面変更なし。DOM更新を省略"
+      );
+      setMonitorStatus(
+        stageTransitionText +
+        "｜通信 " + Math.round(fetchEnd-fetchStart) + "ms" +
+        "｜JSON " + Math.round(jsonEnd-fetchEnd) + "ms" +
+        "｜描画変更なし" +
+        "｜試行 " + monitorAttemptCount +
+        "｜タイムアウト累計 " + monitorTimeoutCount +
+        "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+        "#287a35"
       );
       return;
     }
@@ -1020,6 +1066,18 @@ async function load() {
     const renderEnd =
       performance.now();
 
+    setMonitorStatus(
+      stageTransitionText +
+      "｜通信 " + Math.round(fetchEnd-fetchStart) + "ms" +
+      "｜JSON " + Math.round(jsonEnd-fetchEnd) + "ms" +
+      "｜HTML構築 " + Math.round(htmlBuildEnd-htmlBuildStart) + "ms" +
+      "｜画面反映 " + Math.round(renderEnd-renderStart) + "ms" +
+      "｜試行 " + monitorAttemptCount +
+      "｜タイムアウト累計 " + monitorTimeoutCount +
+      "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+      (fetchEnd-fetchStart >= 3000 ? "#a35b00" : "#287a35")
+    );
+
 
     /*
        このloadで新しく検知した回答の
@@ -1450,13 +1508,37 @@ async function load() {
   } catch (error) {
 
     lastRenderSignature = ""; // 描画途中の失敗を次回loadで再試行
+    const elapsedMs = Math.round(performance.now() - loadStart);
+
     if (error && error.name === "AbortError") {
+      monitorTimeoutCount++;
+      setMonitorStatus(
+        "通信タイムアウト（9秒）" +
+        "｜今回 " + elapsedMs + "ms" +
+        "｜試行 " + monitorAttemptCount +
+        "｜タイムアウト累計 " + monitorTimeoutCount +
+        "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+        "#b00020"
+      );
       console.warn(
-        "【MONITOR】GAS取得が4秒を超えたため今回の取得を中止。次回取得へ。"
+        "【MONITOR原因追及】GAS取得タイムアウト",
+        "今回=" + elapsedMs + "ms",
+        "試行=" + monitorAttemptCount,
+        "タイムアウト累計=" + monitorTimeoutCount
       );
     } else {
+      monitorErrorCount++;
+      const errorText = error && error.message ? error.message : String(error);
+      setMonitorStatus(
+        "取得エラー " + errorText +
+        "｜今回 " + elapsedMs + "ms" +
+        "｜試行 " + monitorAttemptCount +
+        "｜エラー累計 " + monitorErrorCount +
+        "｜タイムアウト累計 " + monitorTimeoutCount,
+        "#b00020"
+      );
       console.error(
-        "データ取得エラー:",
+        "【MONITOR原因追及】データ取得エラー:",
         error
       );
     }

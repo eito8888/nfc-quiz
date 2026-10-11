@@ -335,6 +335,14 @@ async function load() {
   const loadStart =
     performance.now();
 
+  /* 通信待ち中であることを表示し、古い状態表示との混同を防ぐ */
+  setMonitorStatus(
+    "通信中｜試行 " + monitorAttemptCount +
+    "｜表示中ステージ " +
+    (monitorLastSuccessfulStage === null ? "未取得" : monitorLastSuccessfulStage) +
+    "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+    "#a35b00"
+  );
 
   try {
 
@@ -379,6 +387,9 @@ async function load() {
     const fetchEnd =
       performance.now();
 
+    if (!res.ok) {
+      throw new Error("HTTP " + res.status + " " + res.statusText);
+    }
 
     /* -----------------------------------------
        ② JSON解析
@@ -386,6 +397,10 @@ async function load() {
 
     const data =
       await res.json();
+
+    if (!data || typeof data !== "object" || Array.isArray(data)) {
+      throw new Error("GAS応答がJSONオブジェクトではありません");
+    }
 
 
     const jsonEnd =
@@ -449,13 +464,16 @@ async function load() {
         data.currentStage
       );
 
+    if (!Number.isFinite(currentStage)) {
+      throw new Error("GAS応答のcurrentStageが不正です: " + data.currentStage);
+    }
+
     const stageTransitionText =
       monitorLastSuccessfulStage === null
         ? "初回データ取得"
         : (monitorLastSuccessfulStage !== currentStage
             ? "ステージ切換 " + monitorLastSuccessfulStage + "→" + currentStage
             : "ステージ変更なし");
-    monitorLastSuccessfulStage = currentStage;
 
     /* -----------------------------------------
        写真先読み
@@ -514,6 +532,7 @@ async function load() {
       console.log(
         "【MONITOR】画面変更なし。DOM更新を省略"
       );
+      monitorLastSuccessfulStage = currentStage;
       setMonitorStatus(
         stageTransitionText +
         "｜通信 " + Math.round(fetchEnd-fetchStart) + "ms" +
@@ -553,7 +572,18 @@ async function load() {
            </div>`;
 
 
-         lastRenderSignature = renderSignature;
+        lastRenderSignature = renderSignature;
+        monitorLastSuccessfulStage = currentStage;
+        setMonitorStatus(
+          stageTransitionText +
+          "｜通信 " + Math.round(fetchEnd-fetchStart) + "ms" +
+          "｜JSON " + Math.round(jsonEnd-fetchEnd) + "ms" +
+          "｜結果発表画面反映済み（回答データなし）" +
+          "｜試行 " + monitorAttemptCount +
+          "｜タイムアウト累計 " + monitorTimeoutCount +
+          "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+          (fetchEnd-fetchStart >= 3000 ? "#a35b00" : "#287a35")
+        );
         return;
       }
 
@@ -614,8 +644,18 @@ async function load() {
       `;
 
       lastRenderSignature = renderSignature;
-
-            return;
+      monitorLastSuccessfulStage = currentStage;
+      setMonitorStatus(
+        stageTransitionText +
+        "｜通信 " + Math.round(fetchEnd-fetchStart) + "ms" +
+        "｜JSON " + Math.round(jsonEnd-fetchEnd) + "ms" +
+        "｜結果発表画面反映済み" +
+        "｜試行 " + monitorAttemptCount +
+        "｜タイムアウト累計 " + monitorTimeoutCount +
+        "｜起動後 " + Math.round(Date.now()-monitorPageStartMs) + "ms",
+        (fetchEnd-fetchStart >= 3000 ? "#a35b00" : "#287a35")
+      );
+      return;
     }
 
 
@@ -1060,7 +1100,8 @@ async function load() {
       .innerText =
         stageTitle;
 
-     lastRenderSignature = renderSignature;
+    lastRenderSignature = renderSignature;
+    monitorLastSuccessfulStage = currentStage;
 
 
     const renderEnd =
@@ -1534,7 +1575,9 @@ async function load() {
         "｜今回 " + elapsedMs + "ms" +
         "｜試行 " + monitorAttemptCount +
         "｜エラー累計 " + monitorErrorCount +
-        "｜タイムアウト累計 " + monitorTimeoutCount,
+        "｜タイムアウト累計 " + monitorTimeoutCount +
+        "｜表示中ステージ " +
+        (monitorLastSuccessfulStage === null ? "未取得" : monitorLastSuccessfulStage),
         "#b00020"
       );
       console.error(

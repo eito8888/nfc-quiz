@@ -468,6 +468,16 @@ async function load() {
       throw new Error("GAS応答のcurrentStageが不正です: " + data.currentStage);
     }
 
+    // control!B2 の切替途中でGASが -1 を返した場合は、
+    // 結果発表画面などへ切り替えず、現在の画面をそのまま維持する。
+    if (currentStage < 0) {
+      setMonitorStatus(
+        "control!B2 が空欄のため現在の画面を維持しています",
+        "#a35b00"
+      );
+      return;
+    }
+
     const stageTransitionText =
       monitorLastSuccessfulStage === null
         ? "初回データ取得"
